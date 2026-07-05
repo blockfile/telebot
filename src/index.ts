@@ -15,7 +15,7 @@ import { fetchTop10Pct } from './checks/holders';
 import { Telegram, formatAlert } from './telegram';
 import { maybeSendSummary } from './summary';
 import { log } from './logger';
-import { TOTAL_SUPPLY, type NewTokenEvent, type TradeEvent } from './types';
+import { TOTAL_SUPPLY, type NewTokenEvent, type TradeEvent, type MigrationEvent } from './types';
 
 const DRY = process.argv.includes('--dry');
 
@@ -70,7 +70,7 @@ async function handleNew(event: NewTokenEvent): Promise<void> {
     if (handle) db.recordHandle(handle, event.mint, event.receivedAt);
 
     if (result.pass && meta !== 'unknown') {
-      watchlist.add(event, meta, Date.now());
+      watchlist.add(event, meta, event.receivedAt);
       db.setOutcome(event.mint, 'watching');
     }
   } catch (err) {
@@ -96,6 +96,12 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
       checkXExists,
     });
 
+    if (results.devHistory === 'unknown' || results.top10Pct === 'unknown') {
+      db.setOutcome(t.event.mint, 'rejected_deep');
+      log('warn', `deep checks incomplete for $${t.event.symbol} (${t.event.mint}) — no alert on partial data`);
+      return;
+    }
+
     const { score, hardRejects, flags } = scoreToken(results, cfg.deep);
     if (hardRejects.length || score < cfg.alertScoreThreshold) {
       db.setOutcome(t.event.mint, 'rejected_deep');
@@ -110,7 +116,7 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
       uniqueBuyers: t.buyers.size,
       devBuyPct: (t.event.devBuyTokens / TOTAL_SUPPLY) * 100,
       devStillHolds: !t.devSold,
-      priorLaunches: results.devHistory === 'unknown' ? 'unknown' : results.devHistory.priorLaunches,
+      priorLaunches: results.devHistory.priorLaunches,
       top10Pct: results.top10Pct,
       twitter: t.meta.twitter, telegram: t.meta.telegram, website: t.meta.website,
     });
@@ -124,12 +130,20 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
     }
   } catch (err) {
     log('error', `handleTrigger ${t.event.mint}: ${(err as Error).message}`);
+    db.setOutcome(t.event.mint, 'rejected_deep');
   }
 }
 
 solPrice.start();
 stream.on('new', (e: NewTokenEvent) => void handleNew(e));
 stream.on('trade', (tr: TradeEvent) => watchlist.onTrade(tr, solPrice.usd, Date.now()));
+stream.on('migration', (m: MigrationEvent) => {
+  const creator = db.getTokenCreator(m.mint);
+  if (creator) {
+    db.bumpDev(creator, 'graduated', Date.now());
+    log('info', `graduated: ${m.mint} (dev ${creator})`);
+  }
+});
 stream.on('status', (s: string) => log('info', `stream: ${s}`));
 stream.connect();
 

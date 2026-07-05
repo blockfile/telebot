@@ -58,4 +58,10 @@ describe('Db', () => {
     expect(db.getOutcome('mintA')).toBe('alerted');
     expect(db.getOutcome('missing')).toBeNull();
   });
+
+  it('looks up token creator by mint', () => {
+    db.recordToken(tok('mintA', { creator: 'devWallet1' }));
+    expect(db.getTokenCreator('mintA')).toBe('devWallet1');
+    expect(db.getTokenCreator('missing')).toBeNull();
+  });
 });

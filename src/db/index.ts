@@ -78,6 +78,11 @@ export class Db {
     return row?.outcome ?? null;
   }
 
+  getTokenCreator(mint: string): string | null {
+    const row = this.db.prepare('SELECT creator FROM tokens WHERE mint = ?').get(mint) as { creator: string } | undefined;
+    return row?.creator ?? null;
+  }
+
   countCreatorLaunches(creator: string, sinceMs: number, excludeMint = ''): number {
     const row = this.db.prepare(
       'SELECT COUNT(*) AS n FROM tokens WHERE creator = ? AND created_at >= ? AND mint != ?'

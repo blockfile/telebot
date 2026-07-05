@@ -1,6 +1,10 @@
-import type { NewTokenEvent, TradeEvent } from '../types';
+import type { NewTokenEvent, TradeEvent, MigrationEvent } from '../types';
 
-type Parsed = { type: 'new'; event: NewTokenEvent } | { type: 'trade'; event: TradeEvent } | null;
+type Parsed =
+  | { type: 'new'; event: NewTokenEvent }
+  | { type: 'trade'; event: TradeEvent }
+  | { type: 'migration'; event: MigrationEvent }
+  | null;
 
 export function parseMessage(raw: string, receivedAt: number): Parsed {
   let msg: Record<string, unknown>;
@@ -23,6 +27,12 @@ export function parseMessage(raw: string, receivedAt: number): Parsed {
         signature: String(msg.signature ?? ''),
         receivedAt,
       },
+    };
+  }
+  if (msg.txType === 'migrate') {
+    return {
+      type: 'migration',
+      event: { mint: msg.mint, signature: String(msg.signature ?? ''), receivedAt },
     };
   }
   if (msg.txType === 'buy' || msg.txType === 'sell') {

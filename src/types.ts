@@ -30,3 +30,9 @@ export interface TokenMeta {
   telegram?: string;
   website?: string;
 }
+
+export interface MigrationEvent {
+  mint: string;
+  signature: string;
+  receivedAt: number;
+}

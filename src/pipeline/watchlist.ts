@@ -30,6 +30,7 @@ export class Watchlist {
   mints(): string[] { return [...this.tokens.keys()]; }
 
   add(event: NewTokenEvent, meta: TokenMeta, now: number): void {
+    if (this.tokens.has(event.mint)) return;
     if (this.tokens.size >= this.cfg.maxConcurrent) {
       let oldest: WatchedToken | null = null;
       for (const t of this.tokens.values()) {

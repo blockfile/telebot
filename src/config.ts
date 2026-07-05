@@ -48,12 +48,27 @@ export function loadConfig(path = 'config.json'): AppConfig {
   const cfg = JSON.parse(readFileSync(path, 'utf8')) as AppConfig;
   const required: Array<[string, unknown]> = [
     ['stage1.maxDevBuyPct', cfg.stage1?.maxDevBuyPct],
+    ['stage1.maxCreatorLaunches48h', cfg.stage1?.maxCreatorLaunches48h],
+    ['stage1.tickerCloneWindowHours', cfg.stage1?.tickerCloneWindowHours],
+    ['watch.windowMinutes', cfg.watch?.windowMinutes],
+    ['watch.maxConcurrent', cfg.watch?.maxConcurrent],
     ['watch.triggerMarketCapUsd', cfg.watch?.triggerMarketCapUsd],
     ['watch.triggerUniqueBuyers', cfg.watch?.triggerUniqueBuyers],
-    ['watch.windowMinutes', cfg.watch?.windowMinutes],
+    ['watch.bundleWindowMs', cfg.watch?.bundleWindowMs],
+    ['watch.bundleMaxBuyers', cfg.watch?.bundleMaxBuyers],
+    ['deep.maxLifetimeLaunches', cfg.deep?.maxLifetimeLaunches],
+    ['deep.priorLaunchPenalty', cfg.deep?.priorLaunchPenalty],
+    ['deep.graduatedBonus', cfg.deep?.graduatedBonus],
     ['deep.top10HardRejectPct', cfg.deep?.top10HardRejectPct],
+    ['deep.top10BonusPct', cfg.deep?.top10BonusPct],
+    ['deep.top10Bonus', cfg.deep?.top10Bonus],
+    ['deep.deadLinkPenalty', cfg.deep?.deadLinkPenalty],
+    ['deep.liveWebsiteBonus', cfg.deep?.liveWebsiteBonus],
+    ['deep.xMissingPenalty', cfg.deep?.xMissingPenalty],
+    ['deep.devHoldsBonus', cfg.deep?.devHoldsBonus],
     ['alertScoreThreshold', cfg.alertScoreThreshold],
     ['solPriceFallbackUsd', cfg.solPriceFallbackUsd],
+    ['summaryHourLocal', cfg.summaryHourLocal],
   ];
   for (const [name, v] of required) {
     if (typeof v !== 'number') throw new Error(`config.json missing numeric field: ${name}`);

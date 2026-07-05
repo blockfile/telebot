@@ -87,6 +87,20 @@ describe('Watchlist', () => {
     expect(wl.size).toBe(0);
   });
 
+  it('ignores a duplicate add for a mint already on the watchlist', () => {
+    wl.add(newToken('m1'), {}, 0);
+    wl.onTrade(trade('m1', 'a', true, 31, 100), 100, 100);
+    wl.add(newToken('m1'), {}, 500);
+    expect(subs).toEqual(['m1']); // subscribe not called a second time
+    expect(wl.size).toBe(1);
+    expect(wl.mints()).toEqual(['m1']);
+    // state (buyers) must not have been reset by the duplicate add
+    wl.onTrade(trade('m1', 'b', true, 32, 600), 100, 600);
+    wl.onTrade(trade('m1', 'c', true, 200, 7000), 100, 7000);
+    expect(triggered).toHaveLength(1);
+    expect(triggered[0].buyers.has('a')).toBe(true);
+  });
+
   it('evicts oldest when at capacity', () => {
     wl.add(newToken('m1'), {}, 0);
     wl.add(newToken('m2'), {}, 1);

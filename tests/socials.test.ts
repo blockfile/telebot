@@ -20,6 +20,11 @@ describe('normalizeTwitterHandle', () => {
     expect(normalizeTwitterHandle('')).toBeNull();
     expect(normalizeTwitterHandle('has spaces!!')).toBeNull();
   });
+
+  it('returns null for reserved bare words', () => {
+    expect(normalizeTwitterHandle('search')).toBeNull();
+    expect(normalizeTwitterHandle('@home')).toBeNull();
+  });
 });
 
 describe('normalizeUrl', () => {

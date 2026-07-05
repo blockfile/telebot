@@ -4,7 +4,10 @@ const RESERVED = new Set(['home', 'search', 'explore', 'intent', 'share', 'hasht
 export function normalizeTwitterHandle(input: string): string | null {
   const s = input.trim()
   if (!s) return null
-  if (/^@?[A-Za-z0-9_]{1,15}$/.test(s)) return s.replace(/^@/, '').toLowerCase()
+  if (/^@?[A-Za-z0-9_]{1,15}$/.test(s)) {
+    const h = s.replace(/^@/, '').toLowerCase()
+    return RESERVED.has(h) ? null : h
+  }
 
   let url: URL
   try {

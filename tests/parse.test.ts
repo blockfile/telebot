@@ -43,4 +43,15 @@ describe('parseMessage', () => {
     expect(parseMessage('not json', 1)).toBeNull();
     expect(parseMessage('{"txType":"create"}', 1)).toBeNull();
   });
+
+  it('parses a migrate message into MigrationEvent', () => {
+    const r = parseMessage(JSON.stringify({ txType: 'migrate', mint: 'MintPubkey111', signature: 'sig9' }), 42);
+    expect(r?.type).toBe('migration');
+    if (r?.type !== 'migration') return;
+    expect(r.event).toMatchObject({ mint: 'MintPubkey111', signature: 'sig9', receivedAt: 42 });
+  });
+
+  it('returns null for migrate messages missing mint', () => {
+    expect(parseMessage('{"txType":"migrate","signature":"sig9"}', 1)).toBeNull();
+  });
 });
