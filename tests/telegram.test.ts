@@ -1,0 +1,63 @@
+import { describe, it, expect } from 'vitest';
+import { escapeHtml, formatAlert, Telegram, type AlertData } from '../src/telegram';
+
+const DATA: AlertData = {
+  mint: 'MintPubkey111', name: 'Cool <Token>', symbol: 'COOL', score: 74,
+  flags: ['top10 35%'], marketCapUsd: 18400, ageMinutes: 23, uniqueBuyers: 41,
+  devBuyPct: 2.1, devStillHolds: true, priorLaunches: 0, top10Pct: 21,
+  twitter: 'https://x.com/dev', telegram: 'https://t.me/c', website: undefined,
+};
+
+describe('escapeHtml', () => {
+  it('escapes &, <, >', () => {
+    expect(escapeHtml('a & <b>')).toBe('a &amp; &lt;b&gt;');
+  });
+});
+
+describe('formatAlert', () => {
+  it('renders the full alert with escaped name, copyable CA, links, and flags', () => {
+    const text = formatAlert(DATA);
+    expect(text).toContain('TRENCH ALERT — $COOL');
+    expect(text).toContain('(score 74/100)');
+    expect(text).toContain('Cool &lt;Token&gt;');
+    expect(text).toContain('MC $18.4k • age 23m • buyers 41');
+    expect(text).toContain('<code>MintPubkey111</code>');
+    expect(text).toContain('bought 2.1%, still holds, 0 prior launches');
+    expect(text).toContain('top10 21%');
+    expect(text).toContain('𝕏 ✓  TG ✓  Web ✗');
+    expect(text).toContain('https://pump.fun/coin/MintPubkey111');
+    expect(text).toContain('https://gmgn.ai/sol/token/MintPubkey111');
+    expect(text).toContain('https://solscan.io/token/MintPubkey111');
+    expect(text).toContain('https://rugcheck.xyz/tokens/MintPubkey111');
+    expect(text).toContain('⚠️ top10 35%');
+  });
+
+  it('renders unknowns as ? and omits flag line when empty', () => {
+    const text = formatAlert({ ...DATA, priorLaunches: 'unknown', top10Pct: 'unknown', flags: [] });
+    expect(text).toContain('? prior launches');
+    expect(text).toContain('top10 ?');
+    expect(text).not.toContain('⚠️');
+  });
+});
+
+describe('Telegram', () => {
+  it('posts to the bot API and returns true on ok', async () => {
+    let captured: { url: string; body: string } | null = null;
+    const f = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      captured = { url: String(url), body: String(init?.body) };
+      return new Response('{"ok":true}', { status: 200 });
+    }) as unknown as typeof fetch;
+    const ok = await new Telegram('TOKEN', '42', f).send('hello');
+    expect(ok).toBe(true);
+    expect(captured!.url).toBe('https://api.telegram.org/botTOKEN/sendMessage');
+    const body = JSON.parse(captured!.body);
+    expect(body).toMatchObject({ chat_id: '42', text: 'hello', parse_mode: 'HTML' });
+  });
+
+  it('returns false after 3 failures without throwing', async () => {
+    let calls = 0;
+    const f = (async () => { calls++; return new Response('err', { status: 400 }); }) as unknown as typeof fetch;
+    expect(await new Telegram('T', '1', f).send('x')).toBe(false);
+    expect(calls).toBe(3);
+  });
+});

@@ -1,0 +1,80 @@
+export function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+export interface AlertData {
+  mint: string;
+  name: string;
+  symbol: string;
+  score: number;
+  flags: string[];
+  marketCapUsd: number;
+  ageMinutes: number;
+  uniqueBuyers: number;
+  devBuyPct: number;
+  devStillHolds: boolean;
+  priorLaunches: number | 'unknown';
+  top10Pct: number | 'unknown';
+  twitter?: string;
+  telegram?: string;
+  website?: string;
+}
+
+export function formatAlert(d: AlertData): string {
+  const mc = d.marketCapUsd >= 1000 ? `$${(d.marketCapUsd / 1000).toFixed(1)}k` : `$${d.marketCapUsd.toFixed(0)}`;
+  const mark = (v: string | undefined) => (v ? '✓' : '✗');
+  const top10 = d.top10Pct === 'unknown' ? '?' : `${d.top10Pct.toFixed(0)}%`;
+  const priors = d.priorLaunches === 'unknown' ? '?' : String(d.priorLaunches);
+  const links = [
+    `<a href="https://pump.fun/coin/${d.mint}">pump.fun</a>`,
+    `<a href="https://gmgn.ai/sol/token/${d.mint}">GMGN</a>`,
+    `<a href="https://solscan.io/token/${d.mint}">Solscan</a>`,
+    `<a href="https://rugcheck.xyz/tokens/${d.mint}">RugCheck</a>`,
+  ].join(' | ');
+
+  const lines = [
+    `🎯 <b>TRENCH ALERT — $${escapeHtml(d.symbol)}</b>  (score ${d.score}/100)`,
+    `${escapeHtml(d.name)} • MC ${mc} • age ${d.ageMinutes}m • buyers ${d.uniqueBuyers}`,
+    `CA: <code>${d.mint}</code>`,
+    `Dev: bought ${d.devBuyPct.toFixed(1)}%, ${d.devStillHolds ? 'still holds' : 'sold some'}, ${priors} prior launches`,
+    `Holders: top10 ${top10} • bundle: clean`,
+    `Socials: 𝕏 ${mark(d.twitter)}  TG ${mark(d.telegram)}  Web ${mark(d.website)}`,
+    links,
+  ];
+  if (d.flags.length) lines.push(`⚠️ ${d.flags.map(escapeHtml).join(', ')}`);
+  return lines.join('\n');
+}
+
+export class Telegram {
+  constructor(
+    private botToken: string,
+    private chatId: string,
+    private fetchFn: typeof fetch = fetch,
+  ) {}
+
+  async send(text: string): Promise<boolean> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await this.fetchFn(`https://api.telegram.org/bot${this.botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: this.chatId,
+            text,
+            parse_mode: 'HTML',
+            link_preview_options: { is_disabled: true },
+          }),
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (res.ok) return true;
+        if (res.status === 429) {
+          const j = (await res.json().catch(() => null)) as { parameters?: { retry_after?: number } } | null;
+          await new Promise((r) => setTimeout(r, ((j?.parameters?.retry_after ?? 3) + 1) * 1000));
+        }
+      } catch {
+        // retry
+      }
+    }
+    return false;
+  }
+}
