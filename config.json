@@ -1,0 +1,30 @@
+{
+  "stage1": {
+    "maxDevBuyPct": 10,
+    "maxCreatorLaunches48h": 2,
+    "tickerCloneWindowHours": 24
+  },
+  "watch": {
+    "windowMinutes": 90,
+    "maxConcurrent": 500,
+    "triggerMarketCapUsd": 15000,
+    "triggerUniqueBuyers": 25,
+    "bundleWindowMs": 1500,
+    "bundleMaxBuyers": 8
+  },
+  "deep": {
+    "maxLifetimeLaunches": 3,
+    "priorLaunchPenalty": 15,
+    "graduatedBonus": 20,
+    "top10HardRejectPct": 45,
+    "top10BonusPct": 30,
+    "top10Bonus": 10,
+    "deadLinkPenalty": 10,
+    "liveWebsiteBonus": 10,
+    "xMissingPenalty": 15,
+    "devHoldsBonus": 10
+  },
+  "alertScoreThreshold": 60,
+  "solPriceFallbackUsd": 150,
+  "summaryHourLocal": 9
+}
