@@ -73,6 +73,11 @@ export class Db {
     this.db.prepare('UPDATE tokens SET outcome = ? WHERE mint = ?').run(outcome, mint);
   }
 
+  getOutcome(mint: string): Outcome | null {
+    const row = this.db.prepare('SELECT outcome FROM tokens WHERE mint = ?').get(mint) as { outcome: Outcome } | undefined;
+    return row?.outcome ?? null;
+  }
+
   countCreatorLaunches(creator: string, sinceMs: number, excludeMint = ''): number {
     const row = this.db.prepare(
       'SELECT COUNT(*) AS n FROM tokens WHERE creator = ? AND created_at >= ? AND mint != ?'

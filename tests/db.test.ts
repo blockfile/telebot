@@ -53,7 +53,9 @@ describe('Db', () => {
 
   it('updates outcome', () => {
     db.recordToken(tok('mintA'));
+    expect(db.getOutcome('mintA')).toBe('seen');
     db.setOutcome('mintA', 'alerted');
-    // no throw = pass; outcome verified via countsSince behavior elsewhere
+    expect(db.getOutcome('mintA')).toBe('alerted');
+    expect(db.getOutcome('missing')).toBeNull();
   });
 });
