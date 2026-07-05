@@ -38,8 +38,14 @@ describe('parseMessage', () => {
     expect(sell?.type === 'trade' && sell.event.isBuy).toBe(false);
   });
 
-  it('returns null for confirmations, garbage, and missing mint', () => {
-    expect(parseMessage('{"message":"Successfully subscribed"}', 1)).toBeNull();
+  it('surfaces server notices (acks and errors) instead of dropping them', () => {
+    const ack = parseMessage('{"message":"Successfully subscribed"}', 1);
+    expect(ack).toEqual({ type: 'notice', text: 'Successfully subscribed' });
+    const err = parseMessage('{"message":"\'subscribeTokenTrade\' requires an API key"}', 1);
+    expect(err?.type === 'notice' && err.text).toContain('API key');
+  });
+
+  it('returns null for garbage and missing mint', () => {
     expect(parseMessage('not json', 1)).toBeNull();
     expect(parseMessage('{"txType":"create"}', 1)).toBeNull();
   });

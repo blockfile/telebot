@@ -4,12 +4,16 @@ type Parsed =
   | { type: 'new'; event: NewTokenEvent }
   | { type: 'trade'; event: TradeEvent }
   | { type: 'migration'; event: MigrationEvent }
+  | { type: 'notice'; text: string }
   | null;
 
 export function parseMessage(raw: string, receivedAt: number): Parsed {
   let msg: Record<string, unknown>;
   try { msg = JSON.parse(raw); } catch { return null; }
-  if (!msg || typeof msg !== 'object' || typeof msg.mint !== 'string' || !msg.mint) return null;
+  if (!msg || typeof msg !== 'object') return null;
+  // server acks and errors (e.g. "subscribeTokenTrade requires an API key") must never be dropped silently
+  if (typeof msg.message === 'string') return { type: 'notice', text: msg.message };
+  if (typeof msg.mint !== 'string' || !msg.mint) return null;
 
   if (msg.txType === 'create') {
     return {

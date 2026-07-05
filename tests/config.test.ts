@@ -17,6 +17,15 @@ describe('loadSecrets', () => {
       QUICKNODE_RPC_URL: 'https://x', TELEGRAM_BOT_TOKEN: 't', TELEGRAM_CHAT_ID: '1',
     });
     expect(s.quicknodeRpcUrl).toBe('https://x');
+    expect(s.pumpportalApiKey).toBe(''); // optional — empty when unset
+  });
+
+  it('passes through the optional pumpportal api key', () => {
+    const s = loadSecrets({
+      QUICKNODE_RPC_URL: 'https://x', TELEGRAM_BOT_TOKEN: 't', TELEGRAM_CHAT_ID: '1',
+      PUMPPORTAL_API_KEY: 'pp-key',
+    });
+    expect(s.pumpportalApiKey).toBe('pp-key');
   });
 
   it('throws naming every missing var', () => {

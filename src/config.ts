@@ -42,6 +42,7 @@ export interface Secrets {
   quicknodeRpcUrl: string;
   telegramBotToken: string;
   telegramChatId: string;
+  pumpportalApiKey: string;
 }
 
 export function loadConfig(path = 'config.json'): AppConfig {
@@ -87,6 +88,7 @@ export function loadSecrets(env: Record<string, string | undefined> = process.en
     quicknodeRpcUrl: get('QUICKNODE_RPC_URL'),
     telegramBotToken: get('TELEGRAM_BOT_TOKEN'),
     telegramChatId: get('TELEGRAM_CHAT_ID'),
+    pumpportalApiKey: env['PUMPPORTAL_API_KEY'] ?? '', // optional: unlocks real-time trade streams
   };
   if (missing.length) {
     throw new Error(`Missing required values in .env: ${missing.join(', ')}. Copy .env.example to .env and fill it in.`);

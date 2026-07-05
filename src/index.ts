@@ -25,7 +25,7 @@ const db = new Db('data/scanner.db');
 const rpc = new Rpc(secrets.quicknodeRpcUrl);
 const telegram = new Telegram(secrets.telegramBotToken, secrets.telegramChatId);
 const solPrice = new SolPrice(cfg.solPriceFallbackUsd);
-const stream = new PumpPortalStream();
+const stream = new PumpPortalStream(secrets.pumpportalApiKey);
 
 async function send(text: string): Promise<boolean> {
   if (DRY) {
@@ -169,4 +169,7 @@ process.on('unhandledRejection', (reason) => {
   log('error', `unhandled rejection: ${String(reason)}`);
 });
 
+if (!secrets.pumpportalApiKey) {
+  log('warn', 'PUMPPORTAL_API_KEY is not set — PumpPortal rejects trade streams without a funded API key, so market cap/buyers/dev sells cannot be tracked and NO ALERTS will ever fire. See README "PumpPortal API key".');
+}
 log('info', `Trenches Scanner started${DRY ? ' (DRY RUN — alerts print to console)' : ''} — watching pump.fun`);

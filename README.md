@@ -13,6 +13,7 @@ Before you start, make sure you have:
 - **Node.js version 20 or newer.** This is the free program that runs the scanner. If you don't have it, download the "LTS" installer from [nodejs.org](https://nodejs.org/) and run it — the default options are fine.
 - **A QuickNode Solana mainnet endpoint.** This is a private, reliable connection to the Solana blockchain that the scanner uses to check dev wallets and token holders. Sign up at [quicknode.com](https://www.quicknode.com/), create a new endpoint for the **Solana** chain, **mainnet** network, and copy the HTTP URL it gives you. QuickNode has a free tier that is enough to run this scanner.
 - **A Telegram account.** This is where your alerts will show up. If you don't already use Telegram, install it from your phone's app store or from [telegram.org](https://telegram.org/) and create an account — it takes about a minute.
+- **A PumpPortal API key funded with at least 0.02 SOL (about $3-4, one time).** PumpPortal's feed of new token launches is free, but the live *trade* stream — which the scanner needs to measure market cap, count buyers, and catch dev sells — requires an API key whose wallet holds at least 0.02 SOL. Without it, the scanner still sees every launch but **no alert can ever trigger**. Setup is covered in Step 4 below.
 
 ## 3. Setup
 
@@ -43,23 +44,31 @@ Your chat ID tells the scanner which Telegram chat to send alerts to (yours).
    `https://api.telegram.org/bot<TOKEN>/getUpdates`
 3. You'll see a block of text (JSON). Look for `"message"` and inside it `"chat"`, then `"id"` — a number, for example `123456789`. That number is your chat ID.
 
-**Step 4 — Fill in your configuration file.**
+**Step 4 — Create and fund your PumpPortal API key.**
+
+1. Go to [pumpportal.fun](https://pumpportal.fun/) and create an account/API key (the site generates a wallet tied to the key).
+2. Send at least **0.02 SOL** to that wallet's address from any wallet or exchange. This is a balance requirement PumpPortal checks when you connect — the scanner never spends or trades with it.
+3. Copy the API key.
+
+**Step 5 — Fill in your configuration file.**
 
 ```powershell
 copy .env.example .env
 ```
 
-Now open the new `.env` file in Notepad (or any text editor) and replace the three placeholder values with your own:
+Now open the new `.env` file in Notepad (or any text editor) and replace the placeholder values with your own:
 
 ```
 QUICKNODE_RPC_URL=https://your-endpoint.solana-mainnet.quiknode.pro/your-key/
 TELEGRAM_BOT_TOKEN=123456:ABC-your-bot-token
 TELEGRAM_CHAT_ID=123456789
+PUMPPORTAL_API_KEY=your-pumpportal-api-key
 ```
 
 - `QUICKNODE_RPC_URL` — the endpoint URL from the Requirements step.
 - `TELEGRAM_BOT_TOKEN` — the token from Step 2 above.
 - `TELEGRAM_CHAT_ID` — the chat ID from Step 3 above.
+- `PUMPPORTAL_API_KEY` — the key from Step 4 above. If it's missing, the scanner will print a warning at startup and no alerts will ever fire.
 
 Save the file. Nobody else should ever see this file — it contains the keys to your bot and your blockchain endpoint, so don't share it or upload it anywhere.
 

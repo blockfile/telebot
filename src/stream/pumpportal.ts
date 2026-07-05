@@ -12,9 +12,16 @@ export class PumpPortalStream extends EventEmitter {
   private lastMessageAt = 0;
   private watchdog: NodeJS.Timeout | null = null;
 
+  // PumpPortal gates subscribeTokenTrade behind an API key funded with >= 0.02 SOL;
+  // the new-token and migration feeds work without one.
+  constructor(private apiKey = '') {
+    super();
+  }
+
   connect(): void {
     if (this.closed) return;
-    const ws = new WebSocket(PUMPPORTAL_URL);
+    const url = this.apiKey ? `${PUMPPORTAL_URL}?api-key=${encodeURIComponent(this.apiKey)}` : PUMPPORTAL_URL;
+    const ws = new WebSocket(url);
     this.ws = ws;
 
     ws.on('open', () => {
@@ -32,7 +39,8 @@ export class PumpPortalStream extends EventEmitter {
       this.lastMessageAt = Date.now();
       const parsed = parseMessage(data.toString(), Date.now());
       if (!parsed) return;
-      if (parsed.type === 'new') this.emit('new', parsed.event);
+      if (parsed.type === 'notice') this.emit('status', `pumpportal: ${parsed.text}`);
+      else if (parsed.type === 'new') this.emit('new', parsed.event);
       else if (parsed.type === 'migration') this.emit('migration', parsed.event);
       else this.emit('trade', parsed.event);
     });
