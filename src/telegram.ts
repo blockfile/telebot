@@ -67,7 +67,7 @@ export class Telegram {
           signal: AbortSignal.timeout(10_000),
         });
         if (res.ok) return true;
-        if (res.status === 429) {
+        if (res.status === 429 && attempt < 2) {
           const j = (await res.json().catch(() => null)) as { parameters?: { retry_after?: number } } | null;
           await new Promise((r) => setTimeout(r, ((j?.parameters?.retry_after ?? 3) + 1) * 1000));
         }

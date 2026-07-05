@@ -60,4 +60,20 @@ describe('Telegram', () => {
     expect(await new Telegram('T', '1', f).send('x')).toBe(false);
     expect(calls).toBe(3);
   });
+
+  it('waits out a 429 using retry_after then succeeds', async () => {
+    let calls = 0;
+    const f = (async () => {
+      calls++;
+      if (calls === 1) {
+        return new Response('{"ok":false,"parameters":{"retry_after":0}}', { status: 429 });
+      }
+      return new Response('{"ok":true}', { status: 200 });
+    }) as unknown as typeof fetch;
+    const start = Date.now();
+    const ok = await new Telegram('T', '1', f).send('x');
+    expect(ok).toBe(true);
+    expect(calls).toBe(2);
+    expect(Date.now() - start).toBeGreaterThanOrEqual(900); // waited (0 + 1)s
+  }, 10_000);
 });
