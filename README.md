@@ -99,6 +99,7 @@ All of the scanner's tunable behavior lives in `config.json` in the project fold
 | `alertScoreThreshold` | The minimum score (out of 100) a token needs after the deep check to trigger a Telegram alert. | Lower = more alerts, including weaker/riskier tokens. Higher = fewer, higher-confidence alerts. |
 | `watch.windowMinutes` | How long (in minutes) the scanner watches a new token for trading traction before giving up on it. | Lower = faster decisions but may miss slow-building tokens. Higher = catches slower risers but ties up more of the watch list. |
 | `stage1.maxDevBuyPct` | The maximum percentage of a token's supply the developer's own wallet is allowed to buy at launch before the token is rejected outright. | Lower = stricter, rejects more tokens upfront (fewer alerts overall, less dev-dump risk). Higher = more lenient, lets through tokens with bigger dev buys. |
+| `stage1.requireTelegramOrWebsite` | Whether a token needs a Telegram group or website in addition to its Twitter/X link to pass the first filter. A Twitter/X link is always required either way. | `false` (default) = tokens that launch with only a tweet or X community can still alert — fits the current meta, roughly 2-4x more alerts. `true` = stricter, only "prepared" launches with a Telegram or website get through. |
 
 ## 6. How scoring works
 

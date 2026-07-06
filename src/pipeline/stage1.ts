@@ -19,7 +19,9 @@ export function stage1Filter(input: Stage1Input, cfg: Stage1Config): Stage1Resul
   const { event, meta } = input;
   if (meta === 'unknown') return { pass: false, reason: 'metadata unavailable' };
   if (!meta.twitter) return { pass: false, reason: 'no twitter link' };
-  if (!meta.telegram && !meta.website) return { pass: false, reason: 'no telegram or website' };
+  if (cfg.requireTelegramOrWebsite && !meta.telegram && !meta.website) {
+    return { pass: false, reason: 'no telegram or website' };
+  }
   if (input.handleSeenBefore) return { pass: false, reason: 'twitter handle reused' };
 
   const devBuyPct = (event.devBuyTokens / TOTAL_SUPPLY) * 100;

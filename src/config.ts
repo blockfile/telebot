@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { readFileSync } from 'node:fs';
 
 export interface Stage1Config {
+  requireTelegramOrWebsite: boolean;
   maxDevBuyPct: number;
   maxCreatorLaunches48h: number;
   tickerCloneWindowHours: number;
@@ -73,6 +74,9 @@ export function loadConfig(path = 'config.json'): AppConfig {
   ];
   for (const [name, v] of required) {
     if (typeof v !== 'number') throw new Error(`config.json missing numeric field: ${name}`);
+  }
+  if (typeof cfg.stage1?.requireTelegramOrWebsite !== 'boolean') {
+    throw new Error('config.json missing boolean field: stage1.requireTelegramOrWebsite');
   }
   return cfg;
 }

@@ -1,5 +1,6 @@
 {
   "stage1": {
+    "requireTelegramOrWebsite": false,
     "maxDevBuyPct": 10,
     "maxCreatorLaunches48h": 2,
     "tickerCloneWindowHours": 24

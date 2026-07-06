@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { stage1Filter, type Stage1Input } from '../src/pipeline/stage1';
 import type { NewTokenEvent } from '../src/types';
 
-const CFG = { maxDevBuyPct: 10, maxCreatorLaunches48h: 2, tickerCloneWindowHours: 24 };
+const CFG = { requireTelegramOrWebsite: true, maxDevBuyPct: 10, maxCreatorLaunches48h: 2, tickerCloneWindowHours: 24 };
 
 const event = (over: Partial<NewTokenEvent> = {}): NewTokenEvent => ({
   mint: 'mintA', name: 'Cool', symbol: 'COOL', uri: 'https://u', creator: 'dev1',
@@ -28,6 +28,13 @@ describe('stage1Filter', () => {
     expect(stage1Filter(input({ meta: { telegram: 'https://t.me/c' } }), CFG).reason).toBe('no twitter link');
     expect(stage1Filter(input({ meta: { twitter: 'https://x.com/dev' } }), CFG).reason).toBe('no telegram or website');
     expect(stage1Filter(input({ meta: { twitter: 'https://x.com/dev', website: 'https://c.io' } }), CFG).pass).toBe(true);
+  });
+
+  it('accepts twitter-only tokens when requireTelegramOrWebsite is off', () => {
+    const loose = { ...CFG, requireTelegramOrWebsite: false };
+    expect(stage1Filter(input({ meta: { twitter: 'https://x.com/dev' } }), loose)).toEqual({ pass: true });
+    // twitter itself stays mandatory even in loose mode
+    expect(stage1Filter(input({ meta: { telegram: 'https://t.me/c' } }), loose).reason).toBe('no twitter link');
   });
 
   it('rejects reused handles, serial deployers, ticker clones', () => {

@@ -8,6 +8,7 @@ describe('loadConfig', () => {
     expect(cfg.watch.triggerUniqueBuyers).toBe(25);
     expect(cfg.alertScoreThreshold).toBe(60);
     expect(cfg.stage1.maxDevBuyPct).toBe(10);
+    expect(typeof cfg.stage1.requireTelegramOrWebsite).toBe('boolean');
   });
 });
 
