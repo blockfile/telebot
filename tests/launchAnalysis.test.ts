@@ -71,4 +71,68 @@ describe('analyzeLaunch', () => {
     const rpc = { call: async (m: string) => (m === 'getTransaction' ? null : []) } as unknown as Rpc;
     expect(await analyzeLaunch(rpc, MINT, CURVE, DEV, 'create', 60)).toBe('unknown');
   });
+
+  it("returns 'unknown' when the creator's getSignaturesForAddress call rejects, instead of reading as a clean 0% dev outflow", async () => {
+    const rpc = {
+      call: async (method: string, params: unknown[]) => {
+        if (method === 'getTransaction') return { slot: 100 };
+        if (method === 'getSignaturesForAddress') {
+          const addr = params[0] as string;
+          if (addr === CURVE) return [{ signature: 'create', slot: 100 }];
+          if (addr === DEV) throw new Error('RPC unavailable');
+        }
+        throw new Error('unexpected ' + method);
+      },
+    } as unknown as Rpc;
+    expect(await analyzeLaunch(rpc, MINT, CURVE, DEV, 'create', 60)).toBe('unknown');
+  });
+
+  it('caps first20Pct at the first 20 distinct buyers, summing repeat buys but excluding the 21st buyer', async () => {
+    const buyerCount = 21;
+    const curveSigs = [
+      { signature: 'create', slot: 100 },
+      ...Array.from({ length: buyerCount }, (_, i) => ({ signature: `b${i + 1}`, slot: 100 })),
+      { signature: 'b1-again', slot: 100 }, // buyer1 buys a second time
+    ];
+    const txBySig: Record<string, unknown> = { 'b1-again': buy('buyer1', 1_000_000) };
+    for (let i = 1; i <= buyerCount; i++) txBySig[`b${i}`] = buy(`buyer${i}`, 1_000_000);
+
+    const rpc = fakeRpc({ createSlot: 100, curveSigs, txBySig });
+    const r = await analyzeLaunch(rpc, MINT, CURVE, DEV, 'create', 60);
+    expect(r).not.toBe('unknown');
+    if (r === 'unknown') return;
+    // first 20 distinct buyers = buyer1..buyer20; buyer1's repeat buy is summed in (2M),
+    // buyer2..buyer20 contribute 1M each (19M), buyer21 is excluded entirely => 21M / 1B = 2.1%
+    expect(r.first20Pct).toBeCloseTo(2.1, 5);
+  });
+
+  it('bounds getTransaction fetches to maxEarlyTxFetch per side, never fetching every available signature', async () => {
+    const maxEarlyTxFetch = 10;
+    let getTransactionCalls = 0;
+    const curveSigs = [
+      { signature: 'create', slot: 100 },
+      ...Array.from({ length: 100 }, (_, i) => ({ signature: `c${i}`, slot: 100 })),
+    ];
+    const devSigs = Array.from({ length: 100 }, (_, i) => ({ signature: `d${i}`, slot: 100 }));
+    const rpc = {
+      call: async (method: string, params: unknown[]) => {
+        if (method === 'getTransaction') {
+          getTransactionCalls++;
+          const sig = params[0] as string;
+          return sig === 'create' ? { slot: 100 } : null;
+        }
+        if (method === 'getSignaturesForAddress') {
+          const addr = params[0] as string;
+          if (addr === CURVE) return [...curveSigs].reverse();
+          if (addr === DEV) return [...devSigs].reverse();
+        }
+        throw new Error('unexpected ' + method);
+      },
+    } as unknown as Rpc;
+
+    const r = await analyzeLaunch(rpc, MINT, CURVE, DEV, 'create', maxEarlyTxFetch);
+    expect(r).not.toBe('unknown');
+    // <=10 curve early fetches + <=10 dev early fetches + 1 creation-slot fetch
+    expect(getTransactionCalls).toBeLessThanOrEqual(2 * maxEarlyTxFetch + 1);
+  });
 });

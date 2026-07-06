@@ -59,10 +59,15 @@ export async function analyzeLaunch(
     const first20Tokens = firstOwners.reduce((sum, o) => sum + (boughtByOwner.get(o) ?? 0), 0);
 
     let devOutTokens = 0;
-    const devSigs = await rpc.call<SigInfo[]>('getSignaturesForAddress', [creator, { limit: 1000 }]).catch(() => [] as SigInfo[]);
+    const devSigs = await rpc.call<SigInfo[]>('getSignaturesForAddress', [creator, { limit: 1000 }]);
     if (devSigs?.length) {
-      const devEarly = [...devSigs].reverse().slice(0, maxEarlyTxFetch);
-      const devTxs = await fetchTxs(rpc, devEarly);
+      // Only the creator's activity at/after this token's creation can be an airdrop of THIS mint;
+      // anchoring to the creation slot keeps a serial creator's unrelated history out of the count.
+      // (If the creator made >1000 txs since launch, the earliest transfers may fall outside this
+      //  1000-signature window and devOutflow under-counts — that fails open, since it only ever
+      //  ADDS a penalty/reject, never grants a pass.)
+      const devLaunchEra = [...devSigs].reverse().filter((s) => s.slot >= creationSlot).slice(0, maxEarlyTxFetch);
+      const devTxs = await fetchTxs(rpc, devLaunchEra);
       for (const { tx } of devTxs) devOutTokens += devTransfersFromTx(tx, mint, creator);
     }
 
