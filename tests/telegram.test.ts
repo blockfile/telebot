@@ -52,7 +52,7 @@ describe('formatFollowUp', () => {
     const s = formatFollowUp({ symbol: 'COOL', reason: 'window', peakUsd: 22000, nowUsd: 9000, peakPct: 47, nowPct: -40 });
     expect(s).toContain('$COOL');
     expect(s).toContain('peaked $22.0k (+47%)');
-    expect(s).toContain('now $9.0k (-40%)');
+    expect(s).toContain('now $9.0k (-40% since alert)');
     expect(s).not.toContain('⚠️');
   });
 

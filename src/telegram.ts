@@ -97,5 +97,5 @@ export function formatFollowUp(d: FollowUpData): string {
   const k = (n: number) => (n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toFixed(0)}`);
   const sign = (n: number) => (n >= 0 ? `+${n.toFixed(0)}` : n.toFixed(0));
   const head = d.reason === 'dump' ? '⚠️ ' : '📈 ';
-  return `${head}<b>$${escapeHtml(d.symbol)}</b> follow-up — peaked ${k(d.peakUsd)} (${sign(d.peakPct)}%), now ${k(d.nowUsd)} (${sign(d.nowPct)}%)`;
+  return `${head}<b>$${escapeHtml(d.symbol)}</b> follow-up — peaked ${k(d.peakUsd)} (${sign(d.peakPct)}%), now ${k(d.nowUsd)} (${sign(d.nowPct)}% since alert)`;
 }
