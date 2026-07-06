@@ -165,6 +165,8 @@ All of the scanner's tunable behavior lives in `config.json` in the project fold
 | `watch.windowMinutes` | How long (in minutes) the scanner watches a new token for trading traction before giving up on it. | Lower = faster decisions but may miss slow-building tokens. Higher = catches slower risers but ties up more of the watch list. |
 | `stage1.maxDevBuyPct` | The maximum percentage of a token's supply the developer's own wallet is allowed to buy at launch before the token is rejected outright. | Lower = stricter, rejects more tokens upfront (fewer alerts overall, less dev-dump risk). Higher = more lenient, lets through tokens with bigger dev buys. |
 | `stage1.requireTelegramOrWebsite` | Whether a token needs a Telegram group or website in addition to its Twitter/X link to pass the first filter. A Twitter/X link is always required either way. | `false` (default) = tokens that launch with only a tweet or X community can still alert — fits the current meta, roughly 2-4x more alerts. `true` = stricter, only "prepared" launches with a Telegram or website get through. |
+| `launch.bundleHardRejectPct` | The maximum percentage of supply that can be bundled (bought by insiders in the creation block) before the token is hard-rejected. | Lower = reject tokens with smaller insider bundles, stricter filtering. Higher = accept bundles up to that threshold. |
+| `followUp.windowMinutes` | How long (in minutes) after an alert the scanner tracks the token and watches for performance changes before posting a follow-up message. | Lower = faster follow-up notifications. Higher = longer tracking window catches slower movements and gives more time before reporting. |
 
 ## 6. How scoring works
 
@@ -178,6 +180,8 @@ Every token that survives the deep-check stage starts at a base score of **50** 
 
 **Penalties (score goes down):**
 - **−15** — the developer has prior token launches, but none of them graduated.
+- **−15** — bundle between 20–50% of supply.
+- **−15** — dev moved 10–30% of supply out.
 - **−10 per link** — for each dead/unreachable social link (X/Twitter, Telegram, or website).
 - **−15** — no X (Twitter) account could be found for the project at all.
 
@@ -185,8 +189,16 @@ Every token that survives the deep-check stage starts at a base score of **50** 
 - The developer is a serial launcher (more than 3 prior token launches) with none having ever graduated.
 - The developer's funding wallet is linked to a known rug/scam wallet.
 - The top 10 wallet holders together hold more than 45% of the supply.
+- The launch was **bundled** — more than 50% of supply bought by insiders in the creation block.
+- The **dev moved more than 30%** of supply out to other wallets (hidden-supply / airdrop).
 
 The final score is capped between 0 and 100. A Telegram alert is only sent when a token has **zero hard rejects** and a score of **60 or higher**.
+
+**Understanding the Launch line in your alerts:** Each alert includes a `Launch:` line showing the token's insider trading activity at creation: bundle % (how much supply was bought in the creation block), first-20 % (cumulative share bought by the first 20 distinct buyers), and dev-out % (how much the developer transferred out in the first few minutes). A `?` in any of these fields means the on-chain read was inconclusive (usually a transient RPC failure), but this never blocks an alert — only the developer history and holder concentration checks have hard-reject power.
+
+## 6b. Follow-up messages
+
+After sending an alert, the scanner continues watching that token for approximately `followUp.windowMinutes` (default: 60 minutes). During this window, you'll receive exactly one follow-up message showing the token's peak market cap and current price since the alert, expressed both as dollar values and as percentage gains/losses. If the token dumps more than `followUp.dumpAlertPct` (default: 50%) from its peak during the window, you'll get an earlier ⚠️ alert instead. These follow-up messages are informational only — they reset if the scanner restarts, and they do not influence the scanner's filtering or future alerts.
 
 ## 7. Disclaimer
 
