@@ -70,7 +70,8 @@ export class Telegram {
             chat_id: this.chatId,
             text,
             parse_mode: 'HTML',
-            link_preview_options: { is_disabled: true },
+            // Show the preview card for the first link (pump.fun) — price/MC/chart at a glance.
+            link_preview_options: { is_disabled: false },
           }),
           signal: AbortSignal.timeout(10_000),
         });
