@@ -39,7 +39,7 @@ export function formatAlert(d: AlertData): string {
   const lines = [
     `🎯 <b>TRENCH ALERT — $${escapeHtml(d.symbol)}</b>  (score ${d.score}/100)`,
     `${escapeHtml(d.name)} • MC ${mc} • age ${d.ageMinutes}m • buyers ${d.uniqueBuyers}`,
-    `CA: <code>${d.mint}</code>`,
+    `CA: ${d.mint}`,
     `Dev: bought ${d.devBuyPct.toFixed(1)}%, ${d.devStillHolds ? 'still holds' : 'sold some'}, ${priors} prior launches`,
     `Holders: top10 ${top10}`,
     `Launch: bundle ${pctOrQ(d.bundlePct)} • first-20 ${pctOrQ(d.first20Pct)} • dev-out ${pctOrQ(d.devOutflowPct)}`,

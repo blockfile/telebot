@@ -22,7 +22,8 @@ describe('formatAlert', () => {
     expect(text).toContain('(score 74/100)');
     expect(text).toContain('Cool &lt;Token&gt;');
     expect(text).toContain('MC $18.4k • age 23m • buyers 41');
-    expect(text).toContain('<code>MintPubkey111</code>');
+    expect(text).toContain('CA: MintPubkey111');
+    expect(text).not.toContain('<code>'); // bare CA so scanner bots / userbots can parse it
     expect(text).toContain('bought 2.1%, still holds, 0 prior launches');
     expect(text).toContain('top10 21%');
     expect(text).toContain('𝕏 ✓  TG ✓  Web ✗');
