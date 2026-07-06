@@ -1,0 +1,23 @@
+[Unit]
+# Manual-install template. deploy/setup-ubuntu.sh generates this for you with the
+# right values filled in — only edit this by hand if you are not using that script.
+# Replace YOUR_USER with your Linux username and set WorkingDirectory to the repo path.
+Description=Trenches Scanner - Pump.fun token scanner -> Telegram
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=YOUR_USER
+WorkingDirectory=/home/YOUR_USER/telebot
+ExecStart=/usr/bin/npm start
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=NODE_ENV=production
+Restart=always
+RestartSec=10
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

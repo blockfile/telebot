@@ -88,6 +88,71 @@ npm start
 
 Either way, the scanner keeps running continuously in that terminal window, watching new launches as they happen — leave the window open in the background. To stop it at any time, click into the terminal window and press `Ctrl+C`.
 
+## 4b. Running 24/7 on an Ubuntu server (recommended once you've tuned it)
+
+Running on your own PC means the scanner stops the moment you close the window, sleep the machine, or lose internet. To have it watch the trenches around the clock, put it on a cheap Ubuntu server (any $5–6/month VPS from DigitalOcean, Hetzner, Vultr, etc. is plenty). These steps target **Ubuntu 24.04 LTS** (they also work on 22.04) and assume you log in as a normal user who can use `sudo` (the default on most cloud servers). If you log in as `root`, you can drop the `sudo` from each command.
+
+**Important — run only ONE copy at a time.** Once the server is running, stop the scanner on your PC. Running both at once means duplicate Telegram alerts, and PumpPortal may refuse the second connection using the same API key.
+
+**Step 1 — Connect to your server and get the code.**
+
+From your Windows PC, open PowerShell and connect (replace with your server's address):
+
+```powershell
+ssh youruser@your.server.ip.address
+```
+
+Then, on the server:
+
+```bash
+sudo apt update && sudo apt install -y git
+git clone https://github.com/blockfile/telebot.git
+cd telebot
+```
+
+**Step 2 — Run the setup script.**
+
+```bash
+bash deploy/setup-ubuntu.sh
+```
+
+This installs Node.js, the tools it needs, all the scanner's dependencies, and registers a background service that will keep it running 24/7 and restart it automatically (including after a server reboot). It takes a couple of minutes and asks for your `sudo` password once or twice.
+
+**Step 3 — Add your keys.**
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+Fill in the same four values you use on your PC — `QUICKNODE_RPC_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, and `PUMPPORTAL_API_KEY`. In the `nano` editor, save with `Ctrl+O` then `Enter`, and exit with `Ctrl+X`.
+
+**Step 4 — Start it.**
+
+```bash
+sudo systemctl start trenches-scanner
+```
+
+That's it — the scanner is now running in the background and will restart on its own if it crashes or the server reboots. You can close your SSH window and it keeps going.
+
+**Watching and controlling it:**
+
+```bash
+journalctl -u trenches-scanner -f      # watch the live log (Ctrl+C to stop watching — does NOT stop the scanner)
+sudo systemctl status trenches-scanner # is it running? how long has it been up?
+sudo systemctl restart trenches-scanner # apply changes after editing .env or config.json
+sudo systemctl stop trenches-scanner    # stop it
+```
+
+**Updating to the latest code later:**
+
+```bash
+cd telebot
+git pull
+npm install
+sudo systemctl restart trenches-scanner
+```
+
 ## 5. Tuning
 
 All of the scanner's tunable behavior lives in `config.json` in the project folder. You can open it in Notepad, change a number, save, and restart the scanner (`Ctrl+C` then run the command again) to apply it. The fields you're most likely to want to adjust:
