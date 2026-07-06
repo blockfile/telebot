@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { escapeHtml, formatAlert, Telegram, type AlertData } from '../src/telegram';
+import { escapeHtml, formatAlert, formatFollowUp, Telegram, type AlertData } from '../src/telegram';
 
 const DATA: AlertData = {
   mint: 'MintPubkey111', name: 'Cool <Token>', symbol: 'COOL', score: 74,
   flags: ['top10 35%'], marketCapUsd: 18400, ageMinutes: 23, uniqueBuyers: 41,
   devBuyPct: 2.1, devStillHolds: true, priorLaunches: 0, top10Pct: 21,
   twitter: 'https://x.com/dev', telegram: 'https://t.me/c', website: undefined,
+  bundlePct: 8, first20Pct: 31, devOutflowPct: 0,
 };
 
 describe('escapeHtml', () => {
@@ -29,6 +30,7 @@ describe('formatAlert', () => {
     expect(text).toContain('https://gmgn.ai/sol/token/MintPubkey111');
     expect(text).toContain('https://solscan.io/token/MintPubkey111');
     expect(text).toContain('https://rugcheck.xyz/tokens/MintPubkey111');
+    expect(text).toContain('Launch: bundle 8% • first-20 31% • dev-out 0%');
     expect(text).toContain('⚠️ top10 35%');
   });
 
@@ -37,6 +39,25 @@ describe('formatAlert', () => {
     expect(text).toContain('? prior launches');
     expect(text).toContain('top10 ?');
     expect(text).not.toContain('⚠️');
+  });
+
+  it('renders unknown launch values as ?', () => {
+    const text = formatAlert({ ...DATA, bundlePct: 'unknown', first20Pct: 'unknown', devOutflowPct: 'unknown' });
+    expect(text).toContain('Launch: bundle ? • first-20 ? • dev-out ?');
+  });
+});
+
+describe('formatFollowUp', () => {
+  it('renders a window follow-up with peak and current performance', () => {
+    const s = formatFollowUp({ symbol: 'COOL', reason: 'window', peakUsd: 22000, nowUsd: 9000, peakPct: 47, nowPct: -40 });
+    expect(s).toContain('$COOL');
+    expect(s).toContain('peaked $22.0k (+47%)');
+    expect(s).toContain('now $9.0k (-40%)');
+    expect(s).not.toContain('⚠️');
+  });
+
+  it('leads dump follow-ups with a warning', () => {
+    expect(formatFollowUp({ symbol: 'RUG', reason: 'dump', peakUsd: 30000, nowUsd: 6000, peakPct: 100, nowPct: -80 })).toContain('⚠️');
   });
 });
 
