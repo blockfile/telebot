@@ -53,7 +53,7 @@ export function formatAlert(d: AlertData): string {
     `🎯 Bundle ${pctOrQ(d.bundlePct)} · First-20 ${pctOrQ(d.first20Pct)} · Dev-out ${pctOrQ(d.devOutflowPct)}`,
     `🔗 𝕏 ${mark(d.twitter)}   TG ${mark(d.telegram)}   Web ${mark(d.website)}`,
     '',
-    d.mint,
+    `<code>${d.mint}</code>`, // tap to copy
     '',
     `📈 ${links}`,
   );

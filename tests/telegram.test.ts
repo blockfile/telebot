@@ -22,9 +22,7 @@ describe('formatAlert', () => {
     expect(text).toContain('Cool &lt;Token&gt;');
     expect(text).toContain('💰 MC $18.4k   📊 Vol $27.6k');
     expect(text).toContain('⏱️ Age 23m   👥 Buyers 41');
-    expect(text).toContain('\nMintPubkey111\n'); // bare CA on its own line
-    expect(text).not.toContain('<code>'); // bare CA so scanner bots / userbots can parse it
-    expect(text).not.toContain('CA:');
+    expect(text).toContain('<code>MintPubkey111</code>'); // CA is tap-to-copy
     expect(text).toContain('🧑‍💻 Dev: 2.1% · still holds · 0 priors');
     expect(text).toContain('🏆 Top 10: 21%');
     expect(text).toContain('🔗 𝕏 ✅   TG ✅   Web ❌');
