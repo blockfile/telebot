@@ -10,6 +10,7 @@ export interface WatchedToken {
   devSold: boolean;
   earlyBuyers: Set<string>;
   lastMarketCapSol: number;
+  volumeSol: number;
   addedAt: number;
 }
 
@@ -43,7 +44,7 @@ export class Watchlist {
     }
     this.tokens.set(event.mint, {
       event, meta, buyers: new Set(), buys: 0, sells: 0, devSold: false,
-      earlyBuyers: new Set(), lastMarketCapSol: event.marketCapSol, addedAt: now,
+      earlyBuyers: new Set(), lastMarketCapSol: event.marketCapSol, volumeSol: 0, addedAt: now,
     });
     this.hooks.subscribe(event.mint);
   }
@@ -52,6 +53,7 @@ export class Watchlist {
     const t = this.tokens.get(trade.mint);
     if (!t) return;
     t.lastMarketCapSol = trade.marketCapSol;
+    t.volumeSol += trade.solAmount; // total traded volume (all trades) — used for the traction gate
     const isDev = trade.trader === t.event.creator;
 
     if (!trade.isBuy) {
@@ -78,7 +80,12 @@ export class Watchlist {
     }
 
     const mcUsd = trade.marketCapSol * solUsd;
-    if (mcUsd >= this.cfg.triggerMarketCapUsd && t.buyers.size >= this.cfg.triggerUniqueBuyers) {
+    const volUsd = t.volumeSol * solUsd;
+    if (
+      mcUsd >= this.cfg.triggerMarketCapUsd &&
+      volUsd >= this.cfg.triggerVolumeUsd &&
+      t.buyers.size >= this.cfg.triggerUniqueBuyers
+    ) {
       this.remove(trade.mint);
       this.hooks.onTrigger(t);
     }

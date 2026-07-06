@@ -131,6 +131,7 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
     const text = formatAlert({
       mint: t.event.mint, name: t.event.name, symbol: t.event.symbol, score, flags,
       marketCapUsd: t.lastMarketCapSol * solPrice.usd,
+      volumeUsd: t.volumeSol * solPrice.usd,
       ageMinutes: Math.round((Date.now() - t.addedAt) / 60_000),
       uniqueBuyers: t.buyers.size,
       devBuyPct: (t.event.devBuyTokens / TOTAL_SUPPLY) * 100,

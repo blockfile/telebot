@@ -8,7 +8,7 @@ const watched = (meta: WatchedToken['meta']): WatchedToken => ({
     devBuySol: 0, bondingCurveKey: 'bc1', marketCapSol: 100, signature: 's', receivedAt: 0,
   },
   meta, buyers: new Set(['a', 'b']), buys: 2, sells: 0, devSold: false,
-  earlyBuyers: new Set(), lastMarketCapSol: 100, addedAt: 0,
+  earlyBuyers: new Set(), lastMarketCapSol: 100, volumeSol: 0, addedAt: 0,
 });
 
 const deps = (over: Partial<DeepCheckDeps> = {}): DeepCheckDeps => ({

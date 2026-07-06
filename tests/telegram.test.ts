@@ -3,7 +3,7 @@ import { escapeHtml, formatAlert, formatFollowUp, Telegram, type AlertData } fro
 
 const DATA: AlertData = {
   mint: 'MintPubkey111', name: 'Cool <Token>', symbol: 'COOL', score: 74,
-  flags: ['top10 35%'], marketCapUsd: 18400, ageMinutes: 23, uniqueBuyers: 41,
+  flags: ['top10 35%'], marketCapUsd: 18400, volumeUsd: 27600, ageMinutes: 23, uniqueBuyers: 41,
   devBuyPct: 2.1, devStillHolds: true, priorLaunches: 0, top10Pct: 21,
   twitter: 'https://x.com/dev', telegram: 'https://t.me/c', website: undefined,
   bundlePct: 8, first20Pct: 31, devOutflowPct: 0,
@@ -21,7 +21,7 @@ describe('formatAlert', () => {
     expect(text).toContain('TRENCH ALERT — $COOL');
     expect(text).toContain('(score 74/100)');
     expect(text).toContain('Cool &lt;Token&gt;');
-    expect(text).toContain('MC $18.4k • age 23m • buyers 41');
+    expect(text).toContain('MC $18.4k • vol $27.6k • age 23m • buyers 41');
     expect(text).toContain('CA: MintPubkey111');
     expect(text).not.toContain('<code>'); // bare CA so scanner bots / userbots can parse it
     expect(text).toContain('bought 2.1%, still holds, 0 prior launches');

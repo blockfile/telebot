@@ -8,8 +8,9 @@
   "watch": {
     "windowMinutes": 90,
     "maxConcurrent": 500,
-    "triggerMarketCapUsd": 15000,
-    "triggerUniqueBuyers": 25,
+    "triggerMarketCapUsd": 5000,
+    "triggerVolumeUsd": 10000,
+    "triggerUniqueBuyers": 15,
     "bundleWindowMs": 1500,
     "bundleMaxBuyers": 8
   },

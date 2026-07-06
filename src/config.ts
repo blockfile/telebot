@@ -12,6 +12,7 @@ export interface WatchConfig {
   windowMinutes: number;
   maxConcurrent: number;
   triggerMarketCapUsd: number;
+  triggerVolumeUsd: number;
   triggerUniqueBuyers: number;
   bundleWindowMs: number;
   bundleMaxBuyers: number;
@@ -73,6 +74,7 @@ export function loadConfig(path = 'config.json'): AppConfig {
     ['watch.windowMinutes', cfg.watch?.windowMinutes],
     ['watch.maxConcurrent', cfg.watch?.maxConcurrent],
     ['watch.triggerMarketCapUsd', cfg.watch?.triggerMarketCapUsd],
+    ['watch.triggerVolumeUsd', cfg.watch?.triggerVolumeUsd],
     ['watch.triggerUniqueBuyers', cfg.watch?.triggerUniqueBuyers],
     ['watch.bundleWindowMs', cfg.watch?.bundleWindowMs],
     ['watch.bundleMaxBuyers', cfg.watch?.bundleMaxBuyers],

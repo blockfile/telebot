@@ -9,6 +9,7 @@ export interface AlertData {
   score: number;
   flags: string[];
   marketCapUsd: number;
+  volumeUsd: number;
   ageMinutes: number;
   uniqueBuyers: number;
   devBuyPct: number;
@@ -24,7 +25,9 @@ export interface AlertData {
 }
 
 export function formatAlert(d: AlertData): string {
-  const mc = d.marketCapUsd >= 1000 ? `$${(d.marketCapUsd / 1000).toFixed(1)}k` : `$${d.marketCapUsd.toFixed(0)}`;
+  const usd = (v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v.toFixed(0)}`);
+  const mc = usd(d.marketCapUsd);
+  const vol = usd(d.volumeUsd);
   const mark = (v: string | undefined) => (v ? '✓' : '✗');
   const top10 = d.top10Pct === 'unknown' ? '?' : `${d.top10Pct.toFixed(0)}%`;
   const priors = d.priorLaunches === 'unknown' ? '?' : String(d.priorLaunches);
@@ -38,7 +41,7 @@ export function formatAlert(d: AlertData): string {
 
   const lines = [
     `🎯 <b>TRENCH ALERT — $${escapeHtml(d.symbol)}</b>  (score ${d.score}/100)`,
-    `${escapeHtml(d.name)} • MC ${mc} • age ${d.ageMinutes}m • buyers ${d.uniqueBuyers}`,
+    `${escapeHtml(d.name)} • MC ${mc} • vol ${vol} • age ${d.ageMinutes}m • buyers ${d.uniqueBuyers}`,
     `CA: ${d.mint}`,
     `Dev: bought ${d.devBuyPct.toFixed(1)}%, ${d.devStillHolds ? 'still holds' : 'sold some'}, ${priors} prior launches`,
     `Holders: top10 ${top10}`,

@@ -4,7 +4,7 @@ import type { NewTokenEvent, TradeEvent } from '../src/types';
 
 const CFG = {
   windowMinutes: 90, maxConcurrent: 3, triggerMarketCapUsd: 15000,
-  triggerUniqueBuyers: 3, bundleWindowMs: 1500, bundleMaxBuyers: 3,
+  triggerVolumeUsd: 200, triggerUniqueBuyers: 3, bundleWindowMs: 1500, bundleMaxBuyers: 3,
 };
 
 const newToken = (mint: string): NewTokenEvent => ({
@@ -12,8 +12,8 @@ const newToken = (mint: string): NewTokenEvent => ({
   bondingCurveKey: 'bc', marketCapSol: 30, signature: 's', receivedAt: 0,
 });
 
-const trade = (mint: string, trader: string, isBuy: boolean, marketCapSol: number, at: number): TradeEvent & { at: number } =>
-  ({ mint, trader, isBuy, tokenAmount: 1, solAmount: 1, marketCapSol, signature: 'x', receivedAt: at, at });
+const trade = (mint: string, trader: string, isBuy: boolean, marketCapSol: number, at: number, solAmount = 1): TradeEvent & { at: number } =>
+  ({ mint, trader, isBuy, tokenAmount: 1, solAmount, marketCapSol, signature: 'x', receivedAt: at, at });
 
 describe('Watchlist', () => {
   let triggered: WatchedToken[]; let disqualified: Array<[WatchedToken, string]>;
@@ -52,6 +52,26 @@ describe('Watchlist', () => {
     wl.add(newToken('m1'), {}, 0);
     wl.onTrade(trade('m1', 'a', true, 500, 5000), 100, 5000);
     expect(triggered).toHaveLength(0);
+  });
+
+  it('does not trigger until traded volume also clears the threshold', () => {
+    const cfg = { ...CFG, triggerVolumeUsd: 1000 }; // require $1000 of volume
+    const tw: WatchedToken[] = [];
+    const w = new Watchlist(cfg, {
+      onTrigger: (t) => tw.push(t), onDisqualify: () => {}, onExpire: () => {},
+      subscribe: () => {}, unsubscribe: () => {},
+    });
+    w.add(newToken('m1'), {}, 0);
+    // MC ($20k) and 3 buyers are satisfied, but volume is only 3 SOL = $300 < $1000
+    w.onTrade(trade('m1', 'a', true, 100, 5000), 100, 5000);
+    w.onTrade(trade('m1', 'b', true, 150, 6000), 100, 6000);
+    w.onTrade(trade('m1', 'c', true, 200, 7000), 100, 7000);
+    expect(tw).toHaveLength(0); // held back purely by the volume gate
+    // a larger buy (8 SOL) pushes cumulative volume to 11 SOL = $1100 >= $1000
+    w.onTrade(trade('m1', 'd', true, 210, 8000, 8), 100, 8000);
+    expect(tw).toHaveLength(1);
+    expect(tw[0].volumeSol).toBe(11);
+    expect(tw[0].buyers.size).toBe(4);
   });
 
   it('disqualifies on dev sell', () => {
