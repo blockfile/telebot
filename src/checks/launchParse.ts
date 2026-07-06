@@ -37,6 +37,10 @@ interface ParsedIx {
   parsed?: { type?: string; info?: { authority?: string; mint?: string; tokenAmount?: { uiAmount?: number | null } } };
 }
 
+// Only SPL `transferChecked` is counted: it carries the mint, so we can attribute the transfer
+// to THIS token. Plain `transfer` omits the mint (would need ATA derivation to attribute) and is
+// deferred — so dev-outflow can under-count airdrops done via plain transfer. Under-count fails
+// safe here (it only ever ADDS a penalty/reject).
 export function devTransfersFromTx(tx: unknown, mint: string, creator: string): number {
   const t = tx as {
     transaction?: { message?: { instructions?: ParsedIx[] } };

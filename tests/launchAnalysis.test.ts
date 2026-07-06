@@ -135,4 +135,30 @@ describe('analyzeLaunch', () => {
     // <=10 curve early fetches + <=10 dev early fetches + 1 creation-slot fetch
     expect(getTransactionCalls).toBeLessThanOrEqual(2 * maxEarlyTxFetch + 1);
   });
+
+  it('excludes the bonding curve mint-in from bundle and first-20 (regression: C1)', async () => {
+    // creation-slot tx: curve ATA gets 970M (must be excluded), dev gets 30M (excluded), one real sniper gets 20M
+    const creationBuys = {
+      meta: {
+        preTokenBalances: [],
+        postTokenBalances: [
+          { accountIndex: 1, mint: MINT, owner: CURVE, uiTokenAmount: { uiAmount: 970_000_000 } },
+          { accountIndex: 2, mint: MINT, owner: DEV, uiTokenAmount: { uiAmount: 30_000_000 } },
+          { accountIndex: 3, mint: MINT, owner: 'sniper1', uiTokenAmount: { uiAmount: 20_000_000 } },
+        ],
+      },
+    };
+    const rpc = fakeRpc({
+      createSlot: 100,
+      curveSigs: [{ signature: 'create', slot: 100 }, { signature: 'b1', slot: 100 }],
+      txBySig: { b1: creationBuys },
+      devSigs: [],
+    });
+    const r = await analyzeLaunch(rpc, MINT, CURVE, DEV, 'create', 60);
+    expect(r).not.toBe('unknown');
+    if (r === 'unknown') return;
+    expect(r.bundlePct).toBeCloseTo(2, 5);    // only sniper1's 20M/1B — NOT ~99%
+    expect(r.first20Pct).toBeCloseTo(2, 5);
+    expect(r.devOutflowPct).toBeCloseTo(0, 5);
+  });
 });

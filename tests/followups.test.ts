@@ -33,6 +33,13 @@ describe('FollowUps', () => {
     expect(fired).toHaveLength(1);
   });
 
+  it('ignores a zero market-cap trade (no spurious dump)', () => {
+    fu.add('m1', 'COOL', 100, 0);
+    fu.onTrade(trade('m1', 0), 1000);
+    expect(fired).toHaveLength(0);
+    expect(fu.has('m1')).toBe(true);
+  });
+
   it('fires a window follow-up after the window elapses', () => {
     fu.add('m1', 'COOL', 100, 0);
     fu.onTrade(trade('m1', 130), 1000);

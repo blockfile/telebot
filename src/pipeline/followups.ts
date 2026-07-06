@@ -33,6 +33,7 @@ export class FollowUps {
   onTrade(trade: TradeEvent, _now: number): void {
     const fu = this.items.get(trade.mint);
     if (!fu) return;
+    if (!(trade.marketCapSol > 0)) return;
     fu.lastMcSol = trade.marketCapSol;
     if (trade.marketCapSol > fu.peakMcSol) fu.peakMcSol = trade.marketCapSol;
     const drawdown = fu.peakMcSol > 0 ? ((fu.peakMcSol - fu.lastMcSol) / fu.peakMcSol) * 100 : 0;

@@ -44,7 +44,7 @@ export async function analyzeLaunch(
     const early = chron.slice(0, maxEarlyTxFetch);
     const txs = await fetchTxs(rpc, early);
 
-    const exclude = new Set([creator]);
+    const exclude = new Set([creator, bondingCurveKey]);
     const firstOwners: string[] = [];
     const boughtByOwner = new Map<string, number>();
     let bundleTokens = 0;

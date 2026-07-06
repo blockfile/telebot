@@ -59,7 +59,7 @@ const followUps = new FollowUps(cfg.followUp, {
       symbol: fu.symbol, reason,
       peakUsd: fu.peakMcSol * solPrice.usd, nowUsd: fu.lastMcSol * solPrice.usd,
       peakPct, nowPct,
-    }));
+    })).then((ok) => { if (!ok) log('error', `follow-up send failed for ${fu.mint}`); });
     log('info', `follow-up (${reason}) $${fu.symbol}: peak ${peakPct.toFixed(0)}% now ${nowPct.toFixed(0)}%`);
   },
 });
