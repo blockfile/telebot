@@ -30,10 +30,28 @@ export interface DeepConfig {
   devHoldsBonus: number;
 }
 
+export interface LaunchConfig {
+  bundleHardRejectPct: number;
+  bundlePenaltyPct: number;
+  bundlePenalty: number;
+  devOutflowHardRejectPct: number;
+  devOutflowPenaltyPct: number;
+  devOutflowPenalty: number;
+  first20FlagPct: number;
+  maxEarlyTxFetch: number;
+}
+
+export interface FollowUpConfig {
+  windowMinutes: number;
+  dumpAlertPct: number;
+}
+
 export interface AppConfig {
   stage1: Stage1Config;
   watch: WatchConfig;
   deep: DeepConfig;
+  launch: LaunchConfig;
+  followUp: FollowUpConfig;
   alertScoreThreshold: number;
   solPriceFallbackUsd: number;
   summaryHourLocal: number;
@@ -68,6 +86,16 @@ export function loadConfig(path = 'config.json'): AppConfig {
     ['deep.liveWebsiteBonus', cfg.deep?.liveWebsiteBonus],
     ['deep.xMissingPenalty', cfg.deep?.xMissingPenalty],
     ['deep.devHoldsBonus', cfg.deep?.devHoldsBonus],
+    ['launch.bundleHardRejectPct', cfg.launch?.bundleHardRejectPct],
+    ['launch.bundlePenaltyPct', cfg.launch?.bundlePenaltyPct],
+    ['launch.bundlePenalty', cfg.launch?.bundlePenalty],
+    ['launch.devOutflowHardRejectPct', cfg.launch?.devOutflowHardRejectPct],
+    ['launch.devOutflowPenaltyPct', cfg.launch?.devOutflowPenaltyPct],
+    ['launch.devOutflowPenalty', cfg.launch?.devOutflowPenalty],
+    ['launch.first20FlagPct', cfg.launch?.first20FlagPct],
+    ['launch.maxEarlyTxFetch', cfg.launch?.maxEarlyTxFetch],
+    ['followUp.windowMinutes', cfg.followUp?.windowMinutes],
+    ['followUp.dumpAlertPct', cfg.followUp?.dumpAlertPct],
     ['alertScoreThreshold', cfg.alertScoreThreshold],
     ['solPriceFallbackUsd', cfg.solPriceFallbackUsd],
     ['summaryHourLocal', cfg.summaryHourLocal],

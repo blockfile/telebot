@@ -10,6 +10,15 @@ describe('loadConfig', () => {
     expect(cfg.stage1.maxDevBuyPct).toBe(10);
     expect(typeof cfg.stage1.requireTelegramOrWebsite).toBe('boolean');
   });
+
+  it('loads the launch and followUp sections', () => {
+    const cfg = loadConfig();
+    expect(cfg.launch.bundleHardRejectPct).toBe(50);
+    expect(cfg.launch.devOutflowHardRejectPct).toBe(30);
+    expect(cfg.launch.maxEarlyTxFetch).toBe(60);
+    expect(cfg.followUp.windowMinutes).toBe(60);
+    expect(cfg.followUp.dumpAlertPct).toBe(50);
+  });
 });
 
 describe('loadSecrets', () => {

@@ -25,6 +25,20 @@
     "xMissingPenalty": 15,
     "devHoldsBonus": 10
   },
+  "launch": {
+    "bundleHardRejectPct": 50,
+    "bundlePenaltyPct": 20,
+    "bundlePenalty": 15,
+    "devOutflowHardRejectPct": 30,
+    "devOutflowPenaltyPct": 10,
+    "devOutflowPenalty": 15,
+    "first20FlagPct": 60,
+    "maxEarlyTxFetch": 60
+  },
+  "followUp": {
+    "windowMinutes": 60,
+    "dumpAlertPct": 50
+  },
   "alertScoreThreshold": 60,
   "solPriceFallbackUsd": 150,
   "summaryHourLocal": 9
