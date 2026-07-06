@@ -18,33 +18,40 @@ describe('escapeHtml', () => {
 describe('formatAlert', () => {
   it('renders the full alert with escaped name, copyable CA, links, and flags', () => {
     const text = formatAlert(DATA);
-    expect(text).toContain('TRENCH ALERT — $COOL');
-    expect(text).toContain('(score 74/100)');
+    expect(text).toContain('⚡ <b>$COOL</b> — score 74/100'); // 74 -> ⚡ (grade tested separately)
     expect(text).toContain('Cool &lt;Token&gt;');
-    expect(text).toContain('MC $18.4k • vol $27.6k • age 23m • buyers 41');
-    expect(text).toContain('CA: MintPubkey111');
+    expect(text).toContain('💰 MC $18.4k   📊 Vol $27.6k');
+    expect(text).toContain('⏱️ Age 23m   👥 Buyers 41');
+    expect(text).toContain('\nMintPubkey111\n'); // bare CA on its own line
     expect(text).not.toContain('<code>'); // bare CA so scanner bots / userbots can parse it
-    expect(text).toContain('bought 2.1%, still holds, 0 prior launches');
-    expect(text).toContain('top10 21%');
-    expect(text).toContain('𝕏 ✓  TG ✓  Web ✗');
+    expect(text).not.toContain('CA:');
+    expect(text).toContain('🧑‍💻 Dev: 2.1% · still holds · 0 priors');
+    expect(text).toContain('🏆 Top 10: 21%');
+    expect(text).toContain('🔗 𝕏 ✅   TG ✅   Web ❌');
     expect(text).toContain('https://pump.fun/coin/MintPubkey111');
     expect(text).toContain('https://gmgn.ai/sol/token/MintPubkey111');
     expect(text).toContain('https://solscan.io/token/MintPubkey111');
     expect(text).toContain('https://rugcheck.xyz/tokens/MintPubkey111');
-    expect(text).toContain('Launch: bundle 8% • first-20 31% • dev-out 0%');
+    expect(text).toContain('🎯 Bundle 8% · First-20 31% · Dev-out 0%');
     expect(text).toContain('⚠️ top10 35%');
+  });
+
+  it('picks the lead emoji from the score', () => {
+    expect(formatAlert({ ...DATA, score: 85 }).startsWith('🔥')).toBe(true);
+    expect(formatAlert({ ...DATA, score: 74 }).startsWith('⚡')).toBe(true);
+    expect(formatAlert({ ...DATA, score: 62 }).startsWith('✅')).toBe(true);
   });
 
   it('renders unknowns as ? and omits flag line when empty', () => {
     const text = formatAlert({ ...DATA, priorLaunches: 'unknown', top10Pct: 'unknown', flags: [] });
-    expect(text).toContain('? prior launches');
-    expect(text).toContain('top10 ?');
+    expect(text).toContain('· ? priors');
+    expect(text).toContain('🏆 Top 10: ?');
     expect(text).not.toContain('⚠️');
   });
 
   it('renders unknown launch values as ?', () => {
     const text = formatAlert({ ...DATA, bundlePct: 'unknown', first20Pct: 'unknown', devOutflowPct: 'unknown' });
-    expect(text).toContain('Launch: bundle ? • first-20 ? • dev-out ?');
+    expect(text).toContain('🎯 Bundle ? · First-20 ? · Dev-out ?');
   });
 });
 

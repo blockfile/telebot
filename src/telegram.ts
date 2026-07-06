@@ -28,28 +28,35 @@ export function formatAlert(d: AlertData): string {
   const usd = (v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v.toFixed(0)}`);
   const mc = usd(d.marketCapUsd);
   const vol = usd(d.volumeUsd);
-  const mark = (v: string | undefined) => (v ? '✓' : '✗');
+  const mark = (v: string | undefined) => (v ? '✅' : '❌');
   const top10 = d.top10Pct === 'unknown' ? '?' : `${d.top10Pct.toFixed(0)}%`;
   const priors = d.priorLaunches === 'unknown' ? '?' : String(d.priorLaunches);
   const pctOrQ = (v: number | 'unknown') => (v === 'unknown' ? '?' : `${v.toFixed(0)}%`);
+  const grade = d.score >= 80 ? '🔥' : d.score >= 70 ? '⚡' : '✅';
   const links = [
     `<a href="https://pump.fun/coin/${d.mint}">pump.fun</a>`,
     `<a href="https://gmgn.ai/sol/token/${d.mint}">GMGN</a>`,
     `<a href="https://solscan.io/token/${d.mint}">Solscan</a>`,
     `<a href="https://rugcheck.xyz/tokens/${d.mint}">RugCheck</a>`,
-  ].join(' | ');
+  ].join(' · ');
 
-  const lines = [
-    `🎯 <b>TRENCH ALERT — $${escapeHtml(d.symbol)}</b>  (score ${d.score}/100)`,
-    `${escapeHtml(d.name)} • MC ${mc} • vol ${vol} • age ${d.ageMinutes}m • buyers ${d.uniqueBuyers}`,
-    `CA: ${d.mint}`,
-    `Dev: bought ${d.devBuyPct.toFixed(1)}%, ${d.devStillHolds ? 'still holds' : 'sold some'}, ${priors} prior launches`,
-    `Holders: top10 ${top10}`,
-    `Launch: bundle ${pctOrQ(d.bundlePct)} • first-20 ${pctOrQ(d.first20Pct)} • dev-out ${pctOrQ(d.devOutflowPct)}`,
-    `Socials: 𝕏 ${mark(d.twitter)}  TG ${mark(d.telegram)}  Web ${mark(d.website)}`,
-    links,
-  ];
-  if (d.flags.length) lines.push(`⚠️ ${d.flags.map(escapeHtml).join(', ')}`);
+  const lines = [`${grade} <b>$${escapeHtml(d.symbol)}</b> — score ${d.score}/100`];
+  if (d.flags.length) lines.push(`⚠️ ${d.flags.map(escapeHtml).join(' · ')}`);
+  lines.push(
+    '',
+    escapeHtml(d.name),
+    `💰 MC ${mc}   📊 Vol ${vol}`,
+    `⏱️ Age ${d.ageMinutes}m   👥 Buyers ${d.uniqueBuyers}`,
+    '',
+    `🧑‍💻 Dev: ${d.devBuyPct.toFixed(1)}% · ${d.devStillHolds ? 'still holds' : 'sold some'} · ${priors} priors`,
+    `🏆 Top 10: ${top10}`,
+    `🎯 Bundle ${pctOrQ(d.bundlePct)} · First-20 ${pctOrQ(d.first20Pct)} · Dev-out ${pctOrQ(d.devOutflowPct)}`,
+    `🔗 𝕏 ${mark(d.twitter)}   TG ${mark(d.telegram)}   Web ${mark(d.website)}`,
+    '',
+    d.mint,
+    '',
+    `📈 ${links}`,
+  );
   return lines.join('\n');
 }
 
