@@ -17,6 +17,7 @@ const deps = (over: Partial<DeepCheckDeps> = {}): DeepCheckDeps => ({
   fetchTop10Pct: async () => 22,
   checkUrlAlive: async () => true,
   checkXExists: async () => true,
+  analyzeLaunch: async () => ({ bundlePct: 8, first20Pct: 31, devOutflowPct: 0 }),
   ...over,
 });
 
@@ -28,6 +29,7 @@ describe('runDeepChecks', () => {
       funderLinkedToRug: false, top10Pct: 22,
       twitterAlive: true, telegramAlive: true, websiteAlive: true,
       xExists: true, devStillHolds: true,
+      bundlePct: 8, first20Pct: 31, devOutflowPct: 0,
     });
   });
 
@@ -60,5 +62,13 @@ describe('runDeepChecks', () => {
     const r = await runDeepChecks(watched({ twitter: 'https://x.com/d' }), deps({ fetchDevHistory: async () => 'unknown' }));
     expect(r.devHistory).toBe('unknown');
     expect(r.funderLinkedToRug).toBe('unknown');
+  });
+
+  it("propagates launch-analysis 'unknown' without failing the others", async () => {
+    const r = await runDeepChecks(watched({ twitter: 'https://x.com/d' }), deps({ analyzeLaunch: async () => 'unknown' }));
+    expect(r.bundlePct).toBe('unknown');
+    expect(r.first20Pct).toBe('unknown');
+    expect(r.devOutflowPct).toBe('unknown');
+    expect(r.top10Pct).toBe(22); // other checks unaffected
   });
 });

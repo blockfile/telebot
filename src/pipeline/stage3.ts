@@ -2,6 +2,7 @@ import type { WatchedToken } from './watchlist';
 import type { CheckResults, Unknown } from './scoring';
 import type { DevHistory } from '../checks/devHistory';
 import type { Liveness } from '../checks/liveness';
+import type { LaunchAnalysis } from '../checks/launchAnalysis';
 import { normalizeTwitterHandle, normalizeUrl } from '../checks/socials';
 
 export interface DeepCheckDeps {
@@ -10,6 +11,7 @@ export interface DeepCheckDeps {
   fetchTop10Pct(mint: string, bondingCurveKey: string): Promise<number | 'unknown'>;
   checkUrlAlive(url: string): Promise<Liveness>;
   checkXExists(handle: string): Promise<Liveness>;
+  analyzeLaunch(mint: string, bondingCurveKey: string, creator: string, creationSignature: string): Promise<LaunchAnalysis | 'unknown'>;
 }
 
 const UNKNOWN = Promise.resolve('unknown' as const);
@@ -17,13 +19,14 @@ const UNKNOWN = Promise.resolve('unknown' as const);
 export async function runDeepChecks(t: WatchedToken, deps: DeepCheckDeps): Promise<CheckResults> {
   const handle = t.meta.twitter ? normalizeTwitterHandle(t.meta.twitter) : null;
 
-  const [devHistory, top10Pct, twitterAlive, telegramAlive, websiteAlive, xExists] = await Promise.all([
+  const [devHistory, top10Pct, twitterAlive, telegramAlive, websiteAlive, xExists, launch] = await Promise.all([
     deps.fetchDevHistory(t.event.creator, t.event.mint),
     deps.fetchTop10Pct(t.event.mint, t.event.bondingCurveKey),
     t.meta.twitter ? deps.checkUrlAlive(normalizeUrl(t.meta.twitter)) : UNKNOWN,
     t.meta.telegram ? deps.checkUrlAlive(normalizeUrl(t.meta.telegram)) : UNKNOWN,
     t.meta.website ? deps.checkUrlAlive(normalizeUrl(t.meta.website)) : UNKNOWN,
     handle ? deps.checkXExists(handle) : UNKNOWN,
+    deps.analyzeLaunch(t.event.mint, t.event.bondingCurveKey, t.event.creator, t.event.signature),
   ]);
 
   let funderLinkedToRug: Unknown<boolean> = 'unknown';
@@ -42,5 +45,8 @@ export async function runDeepChecks(t: WatchedToken, deps: DeepCheckDeps): Promi
     websiteAlive,
     xExists,
     devStillHolds: !t.devSold,
+    bundlePct: launch === 'unknown' ? 'unknown' : launch.bundlePct,
+    first20Pct: launch === 'unknown' ? 'unknown' : launch.first20Pct,
+    devOutflowPct: launch === 'unknown' ? 'unknown' : launch.devOutflowPct,
   };
 }
