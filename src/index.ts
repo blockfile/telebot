@@ -12,7 +12,9 @@ import { normalizeTwitterHandle } from './checks/socials';
 import { checkUrlAlive, checkXExists } from './checks/liveness';
 import { fetchDevHistory } from './checks/devHistory';
 import { fetchTop10Pct } from './checks/holders';
-import { Telegram, formatAlert } from './telegram';
+import { analyzeLaunch } from './checks/launchAnalysis';
+import { FollowUps } from './pipeline/followups';
+import { Telegram, formatAlert, formatFollowUp } from './telegram';
 import { maybeSendSummary } from './summary';
 import { log } from './logger';
 import { TOTAL_SUPPLY, type NewTokenEvent, type TradeEvent, type MigrationEvent } from './types';
@@ -45,6 +47,21 @@ const watchlist = new Watchlist(cfg.watch, {
     log('info', `disqualified $${t.event.symbol} (${t.event.mint}): ${reason}`);
   },
   onTrigger: (t) => void handleTrigger(t),
+});
+
+const followUps = new FollowUps(cfg.followUp, {
+  subscribe: (m) => stream.subscribeTrades(m),
+  unsubscribe: (m) => stream.unsubscribeTrades(m),
+  fire: (fu, reason) => {
+    const nowPct = fu.alertMcSol > 0 ? ((fu.lastMcSol - fu.alertMcSol) / fu.alertMcSol) * 100 : 0;
+    const peakPct = fu.alertMcSol > 0 ? ((fu.peakMcSol - fu.alertMcSol) / fu.alertMcSol) * 100 : 0;
+    void send(formatFollowUp({
+      symbol: fu.symbol, reason,
+      peakUsd: fu.peakMcSol * solPrice.usd, nowUsd: fu.lastMcSol * solPrice.usd,
+      peakPct, nowPct,
+    }));
+    log('info', `follow-up (${reason}) $${fu.symbol}: peak ${peakPct.toFixed(0)}% now ${nowPct.toFixed(0)}%`);
+  },
 });
 
 async function handleNew(event: NewTokenEvent): Promise<void> {
@@ -94,6 +111,8 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
       fetchTop10Pct: (mint, curve) => fetchTop10Pct(rpc, mint, curve),
       checkUrlAlive,
       checkXExists,
+      analyzeLaunch: (mint, bondingCurveKey, creator, creationSignature) =>
+        analyzeLaunch(rpc, mint, bondingCurveKey, creator, creationSignature, cfg.launch.maxEarlyTxFetch),
     });
 
     if (results.devHistory === 'unknown' || results.top10Pct === 'unknown') {
@@ -102,7 +121,7 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
       return;
     }
 
-    const { score, hardRejects, flags } = scoreToken(results, cfg.deep);
+    const { score, hardRejects, flags } = scoreToken(results, cfg.deep, cfg.launch);
     if (hardRejects.length || score < cfg.alertScoreThreshold) {
       db.setOutcome(t.event.mint, 'rejected_deep');
       log('info', `rejected $${t.event.symbol}: score ${score}${hardRejects.length ? `, hard: ${hardRejects.join('; ')}` : ''}`);
@@ -118,12 +137,16 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
       devStillHolds: !t.devSold,
       priorLaunches: results.devHistory.priorLaunches,
       top10Pct: results.top10Pct,
+      bundlePct: results.bundlePct,
+      first20Pct: results.first20Pct,
+      devOutflowPct: results.devOutflowPct,
       twitter: t.meta.twitter, telegram: t.meta.telegram, website: t.meta.website,
     });
 
     if (await send(text)) {
       db.recordAlert(t.event.mint, score, DRY, text, Date.now());
       db.setOutcome(t.event.mint, 'alerted');
+      followUps.add(t.event.mint, t.event.symbol, t.lastMarketCapSol, Date.now());
       log('info', `ALERT sent: $${t.event.symbol} score ${score}`);
     } else {
       log('error', `telegram send failed for ${t.event.mint}; payload:\n${text}`);
@@ -136,7 +159,10 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
 
 solPrice.start();
 stream.on('new', (e: NewTokenEvent) => void handleNew(e));
-stream.on('trade', (tr: TradeEvent) => watchlist.onTrade(tr, solPrice.usd, Date.now()));
+stream.on('trade', (tr: TradeEvent) => {
+  watchlist.onTrade(tr, solPrice.usd, Date.now());
+  followUps.onTrade(tr, Date.now());
+});
 stream.on('migration', (m: MigrationEvent) => {
   const creator = db.getTokenCreator(m.mint);
   if (creator) {
@@ -147,7 +173,11 @@ stream.on('migration', (m: MigrationEvent) => {
 stream.on('status', (s: string) => log('info', `stream: ${s}`));
 stream.connect();
 
-setInterval(() => watchlist.sweep(Date.now()), 60_000);
+setInterval(() => {
+  const now = Date.now();
+  watchlist.sweep(now);
+  followUps.sweep(now);
+}, 60_000);
 
 let lastSummaryDay = -1;
 setInterval(() => {
