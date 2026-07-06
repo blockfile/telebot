@@ -64,8 +64,8 @@ export async function analyzeLaunch(
       // Only the creator's activity at/after this token's creation can be an airdrop of THIS mint;
       // anchoring to the creation slot keeps a serial creator's unrelated history out of the count.
       // (If the creator made >1000 txs since launch, the earliest transfers may fall outside this
-      //  1000-signature window and devOutflow under-counts — that fails open, since it only ever
-      //  ADDS a penalty/reject, never grants a pass.)
+      //  1000-signature window and devOutflow under-counts — i.e. it could under-flag a dumping
+      //  dev. Accepted: the window is narrow, and other gates still apply.)
       const devLaunchEra = [...devSigs].reverse().filter((s) => s.slot >= creationSlot).slice(0, maxEarlyTxFetch);
       const devTxs = await fetchTxs(rpc, devLaunchEra);
       for (const { tx } of devTxs) devOutTokens += devTransfersFromTx(tx, mint, creator);
