@@ -1,4 +1,4 @@
-import type { DeepConfig } from '../config';
+import type { DeepConfig, LaunchConfig } from '../config';
 
 export type Unknown<T> = T | 'unknown';
 
@@ -11,6 +11,9 @@ export interface CheckResults {
   websiteAlive: Unknown<boolean>;
   xExists: Unknown<boolean>;
   devStillHolds: boolean;
+  bundlePct: Unknown<number>;
+  first20Pct: Unknown<number>;
+  devOutflowPct: Unknown<number>;
 }
 
 export interface ScoreResult {
@@ -19,7 +22,7 @@ export interface ScoreResult {
   flags: string[];
 }
 
-export function scoreToken(r: CheckResults, cfg: DeepConfig): ScoreResult {
+export function scoreToken(r: CheckResults, cfg: DeepConfig, launch: LaunchConfig): ScoreResult {
   let score = 50;
   const hardRejects: string[] = [];
   const flags: string[] = [];
@@ -66,6 +69,24 @@ export function scoreToken(r: CheckResults, cfg: DeepConfig): ScoreResult {
     flags.push('X account not found');
   }
   if (r.devStillHolds) score += cfg.devHoldsBonus;
+
+  if (r.bundlePct !== 'unknown') {
+    if (r.bundlePct > launch.bundleHardRejectPct) hardRejects.push(`bundle ${r.bundlePct.toFixed(0)}%`);
+    else if (r.bundlePct >= launch.bundlePenaltyPct) {
+      score -= launch.bundlePenalty;
+      flags.push(`bundle ${r.bundlePct.toFixed(0)}%`);
+    }
+  }
+  if (r.devOutflowPct !== 'unknown') {
+    if (r.devOutflowPct > launch.devOutflowHardRejectPct) hardRejects.push(`dev moved out ${r.devOutflowPct.toFixed(0)}%`);
+    else if (r.devOutflowPct >= launch.devOutflowPenaltyPct) {
+      score -= launch.devOutflowPenalty;
+      flags.push(`dev out ${r.devOutflowPct.toFixed(0)}%`);
+    }
+  }
+  if (r.first20Pct !== 'unknown' && r.first20Pct > launch.first20FlagPct) {
+    flags.push(`first-20 hold ${r.first20Pct.toFixed(0)}%`);
+  }
 
   return { score: Math.max(0, Math.min(100, score)), hardRejects, flags };
 }
