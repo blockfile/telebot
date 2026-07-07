@@ -62,6 +62,31 @@ describe('analyzeLaunch', () => {
     expect(r.devOutflowPct).toBeCloseTo(6.2, 5); // 62M / 1B
   });
 
+  it('counts snipers: first buy within sniperSlots after creation, excluding same-slot bundlers', async () => {
+    const rpc = fakeRpc({
+      createSlot: 100,
+      curveSigs: [
+        { signature: 'create', slot: 100 },
+        { signature: 'bundler', slot: 100 },  // creation slot -> bundler, NOT a sniper
+        { signature: 'sniper1', slot: 101 },   // within 3 slots -> sniper
+        { signature: 'sniper2', slot: 103 },   // within 3 slots -> sniper
+        { signature: 'late', slot: 110 },      // beyond sniperSlots -> not a sniper
+      ],
+      txBySig: {
+        bundler: buy('bundlerW', 40_000_000),
+        sniper1: buy('sniperW1', 30_000_000),
+        sniper2: buy('sniperW2', 20_000_000),
+        late: buy('lateW', 10_000_000),
+      },
+    });
+    const r = await analyzeLaunch(rpc, MINT, CURVE, DEV, 'create', 60, 3); // sniperSlots = 3
+    expect(r).not.toBe('unknown');
+    if (r === 'unknown') return;
+    expect(r.sniperCount).toBe(2);              // sniperW1 + sniperW2
+    expect(r.sniperPct).toBeCloseTo(5, 5);      // (30M + 20M) / 1B
+    expect(r.bundlePct).toBeCloseTo(4, 5);      // bundlerW 40M (unchanged by sniper logic)
+  });
+
   it("returns 'unknown' when the earliest captured slot is newer than creation (launch missed)", async () => {
     const rpc = fakeRpc({ createSlot: 100, curveSigs: [{ signature: 'x', slot: 200 }], txBySig: {} });
     expect(await analyzeLaunch(rpc, MINT, CURVE, DEV, 'create', 60)).toBe('unknown');

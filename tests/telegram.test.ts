@@ -27,10 +27,11 @@ describe('buildButtons', () => {
 
 const DATA: AlertData = {
   mint: 'MintPubkey111', name: 'Cool <Token>', symbol: 'COOL', score: 74,
-  flags: ['top10 35%'], marketCapUsd: 18400, volumeUsd: 27600, ageMinutes: 23, uniqueBuyers: 41,
+  flags: ['top10 35%'], marketCapUsd: 18400, topMarketCapUsd: 24000, volumeUsd: 27600,
+  liquidityUsd: 12300, ageMinutes: 23, uniqueBuyers: 41, holderCount: 341,
   devBuyPct: 2.1, devStillHolds: true, priorLaunches: 0, top10Pct: 21,
   twitter: 'https://x.com/dev', telegram: 'https://t.me/c', website: undefined,
-  bundlePct: 8, first20Pct: 31, devOutflowPct: 0,
+  bundlePct: 8, sniperCount: 5, sniperPct: 12, first20Pct: 31, devOutflowPct: 0,
 };
 
 describe('escapeHtml', () => {
@@ -44,13 +45,13 @@ describe('formatAlert', () => {
     const text = formatAlert(DATA);
     expect(text).toContain('⚡ <b>$COOL</b> — score 74/100'); // 74 -> ⚡ (grade tested separately)
     expect(text).toContain('Cool &lt;Token&gt;');
-    expect(text).toContain('💰 MC $18.4k   📊 Vol $27.6k');
-    expect(text).toContain('⏱️ Age 23m   👥 Buyers 41');
+    expect(text).toContain('💰 MC $18.4k (top $24.0k) · 📊 Vol $27.6k · ⏱️ 23m');
+    expect(text).toContain('💧 Liq $12.3k · 👥 41 buyers · 🙋 341 holders');
     expect(text).toContain('<code>MintPubkey111</code>'); // CA is tap-to-copy
     expect(text).toContain('🧑‍💻 Dev: 2.1% · still holds · 0 priors');
     expect(text).toContain('🏆 Top 10: 21%');
     expect(text).toContain('🔗 𝕏 ✅   TG ✅   Web ❌');
-    expect(text).toContain('🎯 Bundle 8% · First-20 31% · Dev-out 0%');
+    expect(text).toContain('🎯 Bundle 8% · Snipers 5 (12%) · First-20 31% · Dev-out 0%');
     expect(text).toContain('⚠️ top10 35%');
     // links are now buttons, not inline text in the caption
     expect(text).not.toContain('href=');
@@ -63,15 +64,16 @@ describe('formatAlert', () => {
   });
 
   it('renders unknowns as ? and omits flag line when empty', () => {
-    const text = formatAlert({ ...DATA, priorLaunches: 'unknown', top10Pct: 'unknown', flags: [] });
+    const text = formatAlert({ ...DATA, priorLaunches: 'unknown', top10Pct: 'unknown', holderCount: 'unknown', flags: [] });
     expect(text).toContain('· ? priors');
     expect(text).toContain('🏆 Top 10: ?');
+    expect(text).toContain('🙋 ? holders');
     expect(text).not.toContain('⚠️');
   });
 
   it('renders unknown launch values as ?', () => {
-    const text = formatAlert({ ...DATA, bundlePct: 'unknown', first20Pct: 'unknown', devOutflowPct: 'unknown' });
-    expect(text).toContain('🎯 Bundle ? · First-20 ? · Dev-out ?');
+    const text = formatAlert({ ...DATA, bundlePct: 'unknown', sniperCount: 'unknown', sniperPct: 'unknown', first20Pct: 'unknown', devOutflowPct: 'unknown' });
+    expect(text).toContain('🎯 Bundle ? · Snipers ? · First-20 ? · Dev-out ?');
   });
 });
 

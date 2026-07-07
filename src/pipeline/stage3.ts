@@ -12,6 +12,7 @@ export interface DeepCheckDeps {
   checkUrlAlive(url: string): Promise<Liveness>;
   checkXExists(handle: string): Promise<Liveness>;
   analyzeLaunch(mint: string, bondingCurveKey: string, creator: string, creationSignature: string): Promise<LaunchAnalysis | 'unknown'>;
+  fetchHolderCount(mint: string, bondingCurveKey: string): Promise<number | 'unknown'>;
 }
 
 const UNKNOWN = Promise.resolve('unknown' as const);
@@ -19,7 +20,7 @@ const UNKNOWN = Promise.resolve('unknown' as const);
 export async function runDeepChecks(t: WatchedToken, deps: DeepCheckDeps): Promise<CheckResults> {
   const handle = t.meta.twitter ? normalizeTwitterHandle(t.meta.twitter) : null;
 
-  const [devHistory, top10Pct, twitterAlive, telegramAlive, websiteAlive, xExists, launch] = await Promise.all([
+  const [devHistory, top10Pct, twitterAlive, telegramAlive, websiteAlive, xExists, launch, holderCount] = await Promise.all([
     deps.fetchDevHistory(t.event.creator, t.event.mint),
     deps.fetchTop10Pct(t.event.mint, t.event.bondingCurveKey),
     t.meta.twitter ? deps.checkUrlAlive(normalizeUrl(t.meta.twitter)) : UNKNOWN,
@@ -27,6 +28,7 @@ export async function runDeepChecks(t: WatchedToken, deps: DeepCheckDeps): Promi
     t.meta.website ? deps.checkUrlAlive(normalizeUrl(t.meta.website)) : UNKNOWN,
     handle ? deps.checkXExists(handle) : UNKNOWN,
     deps.analyzeLaunch(t.event.mint, t.event.bondingCurveKey, t.event.creator, t.event.signature),
+    deps.fetchHolderCount(t.event.mint, t.event.bondingCurveKey),
   ]);
 
   let funderLinkedToRug: Unknown<boolean> = 'unknown';
@@ -48,5 +50,8 @@ export async function runDeepChecks(t: WatchedToken, deps: DeepCheckDeps): Promi
     bundlePct: launch === 'unknown' ? 'unknown' : launch.bundlePct,
     first20Pct: launch === 'unknown' ? 'unknown' : launch.first20Pct,
     devOutflowPct: launch === 'unknown' ? 'unknown' : launch.devOutflowPct,
+    sniperCount: launch === 'unknown' ? 'unknown' : launch.sniperCount,
+    sniperPct: launch === 'unknown' ? 'unknown' : launch.sniperPct,
+    holderCount,
   };
 }

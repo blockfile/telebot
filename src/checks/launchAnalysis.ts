@@ -4,6 +4,8 @@ import { buysFromTx, devTransfersFromTx } from './launchParse';
 
 export interface LaunchAnalysis {
   bundlePct: number;
+  sniperCount: number;
+  sniperPct: number;
   first20Pct: number;
   devOutflowPct: number;
 }
@@ -29,6 +31,7 @@ export async function analyzeLaunch(
   creator: string,
   creationSignature: string,
   maxEarlyTxFetch = 60,
+  sniperSlots = 3,
 ): Promise<LaunchAnalysis | 'unknown'> {
   try {
     const createTx = await rpc.call<{ slot?: number } | null>(
@@ -47,16 +50,30 @@ export async function analyzeLaunch(
     const exclude = new Set([creator, bondingCurveKey]);
     const firstOwners: string[] = [];
     const boughtByOwner = new Map<string, number>();
+    const firstBuySlot = new Map<string, number>();
     let bundleTokens = 0;
 
     for (const { slot, tx } of txs) {
       for (const b of buysFromTx(tx, mint, exclude)) {
         if (slot === creationSlot) bundleTokens += b.amount;
+        if (!firstBuySlot.has(b.owner)) firstBuySlot.set(b.owner, slot);
         if (!boughtByOwner.has(b.owner) && firstOwners.length < 20) firstOwners.push(b.owner);
         boughtByOwner.set(b.owner, (boughtByOwner.get(b.owner) ?? 0) + b.amount);
       }
     }
     const first20Tokens = firstOwners.reduce((sum, o) => sum + (boughtByOwner.get(o) ?? 0), 0);
+
+    // Snipers: wallets whose FIRST buy landed within sniperSlots after creation (bot snipes),
+    // as opposed to same-slot bundlers (counted above) or organic later buyers.
+    let sniperTokens = 0;
+    let sniperCount = 0;
+    for (const [owner, amt] of boughtByOwner) {
+      const fs = firstBuySlot.get(owner) ?? creationSlot;
+      if (fs > creationSlot && fs <= creationSlot + sniperSlots) {
+        sniperCount++;
+        sniperTokens += amt;
+      }
+    }
 
     let devOutTokens = 0;
     const devSigs = await rpc.call<SigInfo[]>('getSignaturesForAddress', [creator, { limit: 1000 }]);
@@ -72,7 +89,13 @@ export async function analyzeLaunch(
     }
 
     const pct = (n: number) => (n / TOTAL_SUPPLY) * 100;
-    return { bundlePct: pct(bundleTokens), first20Pct: pct(first20Tokens), devOutflowPct: pct(devOutTokens) };
+    return {
+      bundlePct: pct(bundleTokens),
+      sniperCount,
+      sniperPct: pct(sniperTokens),
+      first20Pct: pct(first20Tokens),
+      devOutflowPct: pct(devOutTokens),
+    };
   } catch {
     return 'unknown';
   }

@@ -10,6 +10,7 @@ export interface NewTokenEvent {
   devBuySol: number;
   bondingCurveKey: string;
   marketCapSol: number;
+  vSolInBondingCurve: number;
   signature: string;
   receivedAt: number;
 }
@@ -21,6 +22,7 @@ export interface TradeEvent {
   tokenAmount: number;
   solAmount: number;
   marketCapSol: number;
+  vSolInBondingCurve: number;
   signature: string;
   receivedAt: number;
 }

@@ -40,6 +40,7 @@ export interface LaunchConfig {
   devOutflowPenalty: number;
   first20FlagPct: number;
   maxEarlyTxFetch: number;
+  sniperSlots: number;
 }
 
 export interface FollowUpConfig {
@@ -110,6 +111,7 @@ export function loadConfig(path = 'config.json'): AppConfig {
     ['launch.devOutflowPenalty', cfg.launch?.devOutflowPenalty],
     ['launch.first20FlagPct', cfg.launch?.first20FlagPct],
     ['launch.maxEarlyTxFetch', cfg.launch?.maxEarlyTxFetch],
+    ['launch.sniperSlots', cfg.launch?.sniperSlots],
     ['followUp.windowMinutes', cfg.followUp?.windowMinutes],
     ['followUp.dumpAlertPct', cfg.followUp?.dumpAlertPct],
     ['alertScoreThreshold', cfg.alertScoreThreshold],

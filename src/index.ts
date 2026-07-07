@@ -11,7 +11,7 @@ import { fetchMeta, ipfsToHttp } from './checks/metadata';
 import { normalizeTwitterHandle } from './checks/socials';
 import { checkUrlAlive, checkXExists } from './checks/liveness';
 import { fetchDevHistory } from './checks/devHistory';
-import { fetchTop10Pct } from './checks/holders';
+import { fetchTop10Pct, fetchHolderCount } from './checks/holders';
 import { analyzeLaunch } from './checks/launchAnalysis';
 import { FollowUps } from './pipeline/followups';
 import { Telegram, formatAlert, formatFollowUp, buildButtons, type FollowUpData, type Keyboard } from './telegram';
@@ -137,7 +137,8 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
       checkUrlAlive,
       checkXExists,
       analyzeLaunch: (mint, bondingCurveKey, creator, creationSignature) =>
-        analyzeLaunch(rpc, mint, bondingCurveKey, creator, creationSignature, cfg.launch.maxEarlyTxFetch),
+        analyzeLaunch(rpc, mint, bondingCurveKey, creator, creationSignature, cfg.launch.maxEarlyTxFetch, cfg.launch.sniperSlots),
+      fetchHolderCount: (mint, curve) => fetchHolderCount(rpc, mint, curve),
     });
 
     if (results.devHistory === 'unknown' || results.top10Pct === 'unknown') {
@@ -156,14 +157,19 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
     const caption = formatAlert({
       mint: t.event.mint, name: t.event.name, symbol: t.event.symbol, score, flags,
       marketCapUsd: t.lastMarketCapSol * solPrice.usd,
+      topMarketCapUsd: t.peakMarketCapSol * solPrice.usd,
       volumeUsd: t.volumeSol * solPrice.usd,
+      liquidityUsd: t.lastVSolInCurve * solPrice.usd,
       ageMinutes: Math.round((Date.now() - t.addedAt) / 60_000),
       uniqueBuyers: t.buyers.size,
+      holderCount: results.holderCount,
       devBuyPct: (t.event.devBuyTokens / TOTAL_SUPPLY) * 100,
       devStillHolds: !t.devSold,
       priorLaunches: results.devHistory.priorLaunches,
       top10Pct: results.top10Pct,
       bundlePct: results.bundlePct,
+      sniperCount: results.sniperCount,
+      sniperPct: results.sniperPct,
       first20Pct: results.first20Pct,
       devOutflowPct: results.devOutflowPct,
       twitter: t.meta.twitter, telegram: t.meta.telegram, website: t.meta.website,

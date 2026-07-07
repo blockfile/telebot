@@ -10,7 +10,7 @@ const CFG = {
 const LAUNCH = {
   bundleHardRejectPct: 50, bundlePenaltyPct: 20, bundlePenalty: 15,
   devOutflowHardRejectPct: 30, devOutflowPenaltyPct: 10, devOutflowPenalty: 15,
-  first20FlagPct: 60, maxEarlyTxFetch: 60,
+  first20FlagPct: 60, maxEarlyTxFetch: 60, sniperSlots: 3,
 };
 
 const clean = (over: Partial<CheckResults> = {}): CheckResults => ({
@@ -19,6 +19,7 @@ const clean = (over: Partial<CheckResults> = {}): CheckResults => ({
   twitterAlive: true, telegramAlive: true, websiteAlive: true,
   xExists: true, devStillHolds: true,
   bundlePct: 5, first20Pct: 20, devOutflowPct: 0,
+  sniperCount: 'unknown', sniperPct: 'unknown', holderCount: 'unknown',
   ...over,
 });
 

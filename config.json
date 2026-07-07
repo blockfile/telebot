@@ -34,7 +34,8 @@
     "devOutflowPenaltyPct": 10,
     "devOutflowPenalty": 15,
     "first20FlagPct": 60,
-    "maxEarlyTxFetch": 60
+    "maxEarlyTxFetch": 60,
+    "sniperSlots": 3
   },
   "followUp": {
     "windowMinutes": 60,

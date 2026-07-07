@@ -4,7 +4,7 @@ import type { TradeEvent } from '../src/types';
 
 const CFG = { windowMinutes: 60, dumpAlertPct: 50, milestones: [2, 5, 10] };
 const trade = (mint: string, marketCapSol: number): TradeEvent =>
-  ({ mint, trader: 't', isBuy: true, tokenAmount: 1, solAmount: 1, marketCapSol, signature: 's', receivedAt: 0 });
+  ({ mint, trader: 't', isBuy: true, tokenAmount: 1, solAmount: 1, marketCapSol, vSolInBondingCurve: 30, signature: 's', receivedAt: 0 });
 
 describe('FollowUps', () => {
   let fired: Array<[FollowUp, FollowUpEvent]>; let subs: string[]; let unsubs: string[]; let fu: FollowUps;

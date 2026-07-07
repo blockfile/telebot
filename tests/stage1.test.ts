@@ -7,7 +7,7 @@ const CFG = { requireTelegramOrWebsite: true, maxDevBuyPct: 10, maxCreatorLaunch
 const event = (over: Partial<NewTokenEvent> = {}): NewTokenEvent => ({
   mint: 'mintA', name: 'Cool', symbol: 'COOL', uri: 'https://u', creator: 'dev1',
   devBuyTokens: 20_000_000, devBuySol: 1, bondingCurveKey: 'bc', marketCapSol: 31,
-  signature: 's', receivedAt: 0, ...over,
+  vSolInBondingCurve: 30, signature: 's', receivedAt: 0, ...over,
 });
 
 const input = (over: Partial<Stage1Input> = {}): Stage1Input => ({

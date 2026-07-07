@@ -11,7 +11,7 @@ const CREATE = JSON.stringify({
 const BUY = JSON.stringify({
   signature: 'sig2', mint: 'MintPubkey111', traderPublicKey: 'Buyer111', txType: 'buy',
   tokenAmount: 1000000, solAmount: 0.5, newTokenBalance: 1000000,
-  bondingCurveKey: 'Curve111', marketCapSol: 33.1, pool: 'pump',
+  bondingCurveKey: 'Curve111', marketCapSol: 33.1, vSolInBondingCurve: 33, pool: 'pump',
 });
 
 describe('parseMessage', () => {
@@ -22,7 +22,7 @@ describe('parseMessage', () => {
     expect(r.event).toMatchObject({
       mint: 'MintPubkey111', creator: 'DevWallet111', symbol: 'COOL', name: 'Cool Token',
       uri: 'https://ipfs.io/ipfs/abc', devBuyTokens: 35000000, devBuySol: 1.0,
-      bondingCurveKey: 'Curve111', marketCapSol: 31.5, signature: 'sig1', receivedAt: 1234,
+      bondingCurveKey: 'Curve111', marketCapSol: 31.5, vSolInBondingCurve: 31, signature: 'sig1', receivedAt: 1234,
     });
   });
 
@@ -32,7 +32,7 @@ describe('parseMessage', () => {
     if (r?.type !== 'trade') return;
     expect(r.event).toMatchObject({
       mint: 'MintPubkey111', trader: 'Buyer111', isBuy: true,
-      tokenAmount: 1000000, solAmount: 0.5, marketCapSol: 33.1, receivedAt: 5678,
+      tokenAmount: 1000000, solAmount: 0.5, marketCapSol: 33.1, vSolInBondingCurve: 33, receivedAt: 5678,
     });
     const sell = parseMessage(BUY.replace('"buy"', '"sell"'), 1);
     expect(sell?.type === 'trade' && sell.event.isBuy).toBe(false);

@@ -43,14 +43,19 @@ export interface AlertData {
   score: number;
   flags: string[];
   marketCapUsd: number;
+  topMarketCapUsd: number;
   volumeUsd: number;
+  liquidityUsd: number;
   ageMinutes: number;
   uniqueBuyers: number;
+  holderCount: number | 'unknown';
   devBuyPct: number;
   devStillHolds: boolean;
   priorLaunches: number | 'unknown';
   top10Pct: number | 'unknown';
   bundlePct: number | 'unknown';
+  sniperCount: number | 'unknown';
+  sniperPct: number | 'unknown';
   first20Pct: number | 'unknown';
   devOutflowPct: number | 'unknown';
   twitter?: string;
@@ -61,11 +66,15 @@ export interface AlertData {
 export function formatAlert(d: AlertData): string {
   const usd = (v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v.toFixed(0)}`);
   const mc = usd(d.marketCapUsd);
+  const top = usd(d.topMarketCapUsd);
   const vol = usd(d.volumeUsd);
+  const liq = usd(d.liquidityUsd);
   const mark = (v: string | undefined) => (v ? '✅' : '❌');
   const top10 = d.top10Pct === 'unknown' ? '?' : `${d.top10Pct.toFixed(0)}%`;
   const priors = d.priorLaunches === 'unknown' ? '?' : String(d.priorLaunches);
+  const holders = d.holderCount === 'unknown' ? '?' : String(d.holderCount);
   const pctOrQ = (v: number | 'unknown') => (v === 'unknown' ? '?' : `${v.toFixed(0)}%`);
+  const snipers = d.sniperCount === 'unknown' ? '?' : `${d.sniperCount} (${pctOrQ(d.sniperPct)})`;
   const grade = d.score >= 80 ? '🔥' : d.score >= 70 ? '⚡' : '✅';
 
   const lines = [`${grade} <b>$${escapeHtml(d.symbol)}</b> — score ${d.score}/100`];
@@ -73,12 +82,12 @@ export function formatAlert(d: AlertData): string {
   lines.push(
     '',
     escapeHtml(d.name),
-    `💰 MC ${mc}   📊 Vol ${vol}`,
-    `⏱️ Age ${d.ageMinutes}m   👥 Buyers ${d.uniqueBuyers}`,
+    `💰 MC ${mc} (top ${top}) · 📊 Vol ${vol} · ⏱️ ${d.ageMinutes}m`,
+    `💧 Liq ${liq} · 👥 ${d.uniqueBuyers} buyers · 🙋 ${holders} holders`,
     '',
     `🧑‍💻 Dev: ${d.devBuyPct.toFixed(1)}% · ${d.devStillHolds ? 'still holds' : 'sold some'} · ${priors} priors`,
     `🏆 Top 10: ${top10}`,
-    `🎯 Bundle ${pctOrQ(d.bundlePct)} · First-20 ${pctOrQ(d.first20Pct)} · Dev-out ${pctOrQ(d.devOutflowPct)}`,
+    `🎯 Bundle ${pctOrQ(d.bundlePct)} · Snipers ${snipers} · First-20 ${pctOrQ(d.first20Pct)} · Dev-out ${pctOrQ(d.devOutflowPct)}`,
     `🔗 𝕏 ${mark(d.twitter)}   TG ${mark(d.telegram)}   Web ${mark(d.website)}`,
     '',
     `<code>${d.mint}</code>`, // tap to copy — links are now buttons below

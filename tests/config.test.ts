@@ -17,6 +17,7 @@ describe('loadConfig', () => {
     expect(cfg.launch.bundleHardRejectPct).toBe(50);
     expect(cfg.launch.devOutflowHardRejectPct).toBe(30);
     expect(cfg.launch.maxEarlyTxFetch).toBe(60);
+    expect(cfg.launch.sniperSlots).toBe(3);
     expect(cfg.followUp.windowMinutes).toBe(60);
     expect(cfg.followUp.dumpAlertPct).toBe(50);
     expect(cfg.followUp.milestones).toEqual([2, 5, 10, 25, 50, 100]);

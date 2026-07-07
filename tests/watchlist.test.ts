@@ -9,11 +9,11 @@ const CFG = {
 
 const newToken = (mint: string): NewTokenEvent => ({
   mint, name: 'T', symbol: 'T', uri: 'u', creator: 'dev1', devBuyTokens: 0, devBuySol: 0,
-  bondingCurveKey: 'bc', marketCapSol: 30, signature: 's', receivedAt: 0,
+  bondingCurveKey: 'bc', marketCapSol: 30, vSolInBondingCurve: 30, signature: 's', receivedAt: 0,
 });
 
 const trade = (mint: string, trader: string, isBuy: boolean, marketCapSol: number, at: number, solAmount = 1): TradeEvent & { at: number } =>
-  ({ mint, trader, isBuy, tokenAmount: 1, solAmount, marketCapSol, signature: 'x', receivedAt: at, at });
+  ({ mint, trader, isBuy, tokenAmount: 1, solAmount, marketCapSol, vSolInBondingCurve: 30, signature: 'x', receivedAt: at, at });
 
 describe('Watchlist', () => {
   let triggered: WatchedToken[]; let disqualified: Array<[WatchedToken, string]>;

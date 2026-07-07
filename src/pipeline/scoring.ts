@@ -14,6 +14,10 @@ export interface CheckResults {
   bundlePct: Unknown<number>;
   first20Pct: Unknown<number>;
   devOutflowPct: Unknown<number>;
+  // display-only (not scored): sniper activity and holder count
+  sniperCount: Unknown<number>;
+  sniperPct: Unknown<number>;
+  holderCount: Unknown<number>;
 }
 
 export interface ScoreResult {

@@ -5,10 +5,10 @@ import type { WatchedToken } from '../src/pipeline/watchlist';
 const watched = (meta: WatchedToken['meta']): WatchedToken => ({
   event: {
     mint: 'mintA', name: 'T', symbol: 'T', uri: 'u', creator: 'dev1', devBuyTokens: 0,
-    devBuySol: 0, bondingCurveKey: 'bc1', marketCapSol: 100, signature: 's', receivedAt: 0,
+    devBuySol: 0, bondingCurveKey: 'bc1', marketCapSol: 100, vSolInBondingCurve: 30, signature: 's', receivedAt: 0,
   },
   meta, buyers: new Set(['a', 'b']), buys: 2, sells: 0, devSold: false,
-  earlyBuyers: new Set(), lastMarketCapSol: 100, volumeSol: 0, addedAt: 0,
+  earlyBuyers: new Set(), lastMarketCapSol: 100, peakMarketCapSol: 100, lastVSolInCurve: 30, volumeSol: 0, addedAt: 0,
 });
 
 const deps = (over: Partial<DeepCheckDeps> = {}): DeepCheckDeps => ({
@@ -17,7 +17,8 @@ const deps = (over: Partial<DeepCheckDeps> = {}): DeepCheckDeps => ({
   fetchTop10Pct: async () => 22,
   checkUrlAlive: async () => true,
   checkXExists: async () => true,
-  analyzeLaunch: async () => ({ bundlePct: 8, first20Pct: 31, devOutflowPct: 0 }),
+  analyzeLaunch: async () => ({ bundlePct: 8, sniperCount: 4, sniperPct: 12, first20Pct: 31, devOutflowPct: 0 }),
+  fetchHolderCount: async () => 341,
   ...over,
 });
 
@@ -30,6 +31,7 @@ describe('runDeepChecks', () => {
       twitterAlive: true, telegramAlive: true, websiteAlive: true,
       xExists: true, devStillHolds: true,
       bundlePct: 8, first20Pct: 31, devOutflowPct: 0,
+      sniperCount: 4, sniperPct: 12, holderCount: 341,
     });
   });
 
