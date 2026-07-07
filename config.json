@@ -9,7 +9,7 @@
     "windowMinutes": 240,
     "maxConcurrent": 1500,
     "triggerMarketCapUsd": 5000,
-    "triggerVolumeUsd": 10000,
+    "triggerVolumeUsd": 6000,
     "triggerUniqueBuyers": 15,
     "bundleWindowMs": 1500,
     "bundleMaxBuyers": 8
