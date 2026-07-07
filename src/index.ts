@@ -41,7 +41,18 @@ async function send(payload: string | { text: string; photoUrl?: string; buttons
 const watchlist = new Watchlist(cfg.watch, {
   subscribe: (m) => stream.subscribeTrades(m),
   unsubscribe: (m) => stream.unsubscribeTrades(m),
-  onExpire: (t) => db.setOutcome(t.event.mint, 'expired'),
+  onExpire: (t) => {
+    db.setOutcome(t.event.mint, 'expired');
+    // Diagnostic: for tokens that showed some life, log how close they got to the trigger gate.
+    // volume and buyers are cumulative (accurate at expiry); MC is the last seen value.
+    if (t.buyers.size >= 3) {
+      const mc = (t.lastMarketCapSol * solPrice.usd) / 1000;
+      const vol = (t.volumeSol * solPrice.usd) / 1000;
+      const w = cfg.watch;
+      log('info', `expired $${t.event.symbol}: MC ~$${mc.toFixed(1)}k · vol $${vol.toFixed(1)}k · ${t.buyers.size} buyers `
+        + `(need $${w.triggerMarketCapUsd / 1000}k / $${w.triggerVolumeUsd / 1000}k / ${w.triggerUniqueBuyers})`);
+    }
+  },
   onDisqualify: (t, reason) => {
     db.setOutcome(t.event.mint, 'disqualified');
     if (reason === 'dev sold') db.bumpDev(t.event.creator, 'rugged', Date.now());
