@@ -5,7 +5,7 @@ describe('loadConfig', () => {
   it('loads the repo config.json with required numeric thresholds', () => {
     const cfg = loadConfig();
     expect(cfg.watch.triggerMarketCapUsd).toBe(5000);
-    expect(cfg.watch.triggerVolumeUsd).toBe(10000);
+    expect(cfg.watch.triggerVolumeUsd).toBe(6000);
     expect(cfg.watch.triggerUniqueBuyers).toBe(15);
     expect(cfg.alertScoreThreshold).toBe(60);
     expect(cfg.stage1.maxDevBuyPct).toBe(10);
