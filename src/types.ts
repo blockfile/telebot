@@ -29,6 +29,7 @@ export interface TokenMeta {
   twitter?: string;
   telegram?: string;
   website?: string;
+  image?: string;
 }
 
 export interface MigrationEvent {

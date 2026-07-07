@@ -38,7 +38,14 @@
   },
   "followUp": {
     "windowMinutes": 60,
-    "dumpAlertPct": 50
+    "dumpAlertPct": 50,
+    "milestones": [2, 5, 10, 25, 50, 100]
+  },
+  "buttons": {
+    "buy": [],
+    "chart": true,
+    "scan": true,
+    "pumpfun": true
   },
   "alertScoreThreshold": 60,
   "solPriceFallbackUsd": 150,

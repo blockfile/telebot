@@ -9,17 +9,17 @@ describe('ipfsToHttp', () => {
 });
 
 describe('extractMeta', () => {
-  it('extracts trimmed social fields, dropping empties', () => {
-    expect(extractMeta({ twitter: ' https://x.com/dev ', telegram: '', website: 'cool.io', image: 'x' }))
-      .toEqual({ twitter: 'https://x.com/dev', telegram: undefined, website: 'cool.io' });
-    expect(extractMeta(null)).toEqual({ twitter: undefined, telegram: undefined, website: undefined });
+  it('extracts trimmed social + image fields, dropping empties', () => {
+    expect(extractMeta({ twitter: ' https://x.com/dev ', telegram: '', website: 'cool.io', image: ' ipfs://QmImg ' }))
+      .toEqual({ twitter: 'https://x.com/dev', telegram: undefined, website: 'cool.io', image: 'ipfs://QmImg' });
+    expect(extractMeta(null)).toEqual({ twitter: undefined, telegram: undefined, website: undefined, image: undefined });
   });
 });
 
 describe('fetchMeta', () => {
   it('returns parsed meta on success', async () => {
-    const f = (async () => new Response('{"twitter":"https://x.com/dev"}', { status: 200 })) as unknown as typeof fetch;
-    expect(await fetchMeta('https://meta.uri', f)).toEqual({ twitter: 'https://x.com/dev', telegram: undefined, website: undefined });
+    const f = (async () => new Response('{"twitter":"https://x.com/dev","image":"ipfs://QmImg"}', { status: 200 })) as unknown as typeof fetch;
+    expect(await fetchMeta('https://meta.uri', f)).toEqual({ twitter: 'https://x.com/dev', telegram: undefined, website: undefined, image: 'ipfs://QmImg' });
   });
 
   it("returns 'unknown' when both attempts fail", async () => {

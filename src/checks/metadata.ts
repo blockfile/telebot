@@ -10,7 +10,7 @@ export function extractMeta(json: unknown): TokenMeta {
     const v = j[k]
     return typeof v === 'string' && v.trim() ? v.trim() : undefined
   }
-  return { twitter: pick('twitter'), telegram: pick('telegram'), website: pick('website') }
+  return { twitter: pick('twitter'), telegram: pick('telegram'), website: pick('website'), image: pick('image') }
 }
 
 export async function fetchMeta(uri: string, fetchFn: typeof fetch = fetch): Promise<TokenMeta | 'unknown'> {

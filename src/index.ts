@@ -7,14 +7,14 @@ import { Watchlist, type WatchedToken } from './pipeline/watchlist';
 import { stage1Filter } from './pipeline/stage1';
 import { runDeepChecks } from './pipeline/stage3';
 import { scoreToken } from './pipeline/scoring';
-import { fetchMeta } from './checks/metadata';
+import { fetchMeta, ipfsToHttp } from './checks/metadata';
 import { normalizeTwitterHandle } from './checks/socials';
 import { checkUrlAlive, checkXExists } from './checks/liveness';
 import { fetchDevHistory } from './checks/devHistory';
 import { fetchTop10Pct } from './checks/holders';
 import { analyzeLaunch } from './checks/launchAnalysis';
 import { FollowUps } from './pipeline/followups';
-import { Telegram, formatAlert, formatFollowUp } from './telegram';
+import { Telegram, formatAlert, formatFollowUp, buildButtons, type FollowUpData, type Keyboard } from './telegram';
 import { maybeSendSummary } from './summary';
 import { log } from './logger';
 import { TOTAL_SUPPLY, type NewTokenEvent, type TradeEvent, type MigrationEvent } from './types';
@@ -29,12 +29,13 @@ const telegram = new Telegram(secrets.telegramBotToken, secrets.telegramChatId);
 const solPrice = new SolPrice(cfg.solPriceFallbackUsd);
 const stream = new PumpPortalStream(secrets.pumpportalApiKey);
 
-async function send(text: string): Promise<boolean> {
+async function send(payload: string | { text: string; photoUrl?: string; buttons?: Keyboard }): Promise<boolean> {
+  const p = typeof payload === 'string' ? { text: payload } : payload;
   if (DRY) {
-    log('info', `[DRY ALERT]\n${text}`);
+    log('info', `[DRY ALERT]${p.photoUrl ? ' [photo]' : ''}${p.buttons?.length ? ' [buttons]' : ''}\n${p.text}`);
     return true;
   }
-  return telegram.send(text);
+  return telegram.send(p);
 }
 
 const watchlist = new Watchlist(cfg.watch, {
@@ -52,15 +53,28 @@ const watchlist = new Watchlist(cfg.watch, {
 const followUps = new FollowUps(cfg.followUp, {
   subscribe: (m) => stream.subscribeTrades(m),
   unsubscribe: (m) => stream.unsubscribeTrades(m),
-  fire: (fu, reason) => {
-    const nowPct = fu.alertMcSol > 0 ? ((fu.lastMcSol - fu.alertMcSol) / fu.alertMcSol) * 100 : 0;
-    const peakPct = fu.alertMcSol > 0 ? ((fu.peakMcSol - fu.alertMcSol) / fu.alertMcSol) * 100 : 0;
-    void send(formatFollowUp({
-      symbol: fu.symbol, reason,
-      peakUsd: fu.peakMcSol * solPrice.usd, nowUsd: fu.lastMcSol * solPrice.usd,
-      peakPct, nowPct,
-    })).then((ok) => { if (!ok) log('error', `follow-up send failed for ${fu.mint}`); });
-    log('info', `follow-up (${reason}) $${fu.symbol}: peak ${peakPct.toFixed(0)}% now ${nowPct.toFixed(0)}%`);
+  fire: (fu, event) => {
+    let data: FollowUpData;
+    if (event.kind === 'up') {
+      // Show the level for THIS milestone (fromUsd × multiple), not the shared live peak —
+      // otherwise a single trade that jumps through several milestones prints identical $ on each card.
+      data = {
+        kind: 'up', symbol: fu.symbol, mint: fu.mint, multiple: event.multiple,
+        fromUsd: fu.alertMcSol * solPrice.usd, peakUsd: fu.alertMcSol * event.multiple * solPrice.usd,
+      };
+    } else {
+      const nowPct = fu.alertMcSol > 0 ? ((fu.lastMcSol - fu.alertMcSol) / fu.alertMcSol) * 100 : 0;
+      const peakPct = fu.alertMcSol > 0 ? ((fu.peakMcSol - fu.alertMcSol) / fu.alertMcSol) * 100 : 0;
+      data = {
+        kind: event.kind, symbol: fu.symbol, mint: fu.mint,
+        peakUsd: fu.peakMcSol * solPrice.usd, nowUsd: fu.lastMcSol * solPrice.usd, peakPct, nowPct,
+      };
+    }
+    const photoUrl = fu.image ? ipfsToHttp(fu.image) : undefined;
+    const buttons = buildButtons(fu.mint, cfg.buttons, { web: ['chart', 'pumpfun'] });
+    void send({ text: formatFollowUp(data), photoUrl, buttons })
+      .then((ok) => { if (!ok) log('error', `follow-up send failed for ${fu.mint}`); });
+    log('info', `follow-up (${event.kind}${event.kind === 'up' ? ` ${event.multiple}X` : ''}) $${fu.symbol}`);
   },
 });
 
@@ -128,7 +142,7 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
       return;
     }
 
-    const text = formatAlert({
+    const caption = formatAlert({
       mint: t.event.mint, name: t.event.name, symbol: t.event.symbol, score, flags,
       marketCapUsd: t.lastMarketCapSol * solPrice.usd,
       volumeUsd: t.volumeSol * solPrice.usd,
@@ -143,14 +157,16 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
       devOutflowPct: results.devOutflowPct,
       twitter: t.meta.twitter, telegram: t.meta.telegram, website: t.meta.website,
     });
+    const photoUrl = t.meta.image ? ipfsToHttp(t.meta.image) : undefined;
+    const buttons = buildButtons(t.event.mint, cfg.buttons);
 
-    if (await send(text)) {
-      db.recordAlert(t.event.mint, score, DRY, text, Date.now());
+    if (await send({ text: caption, photoUrl, buttons })) {
+      db.recordAlert(t.event.mint, score, DRY, caption, Date.now());
       db.setOutcome(t.event.mint, 'alerted');
-      followUps.add(t.event.mint, t.event.symbol, t.lastMarketCapSol, Date.now());
+      followUps.add(t.event.mint, t.event.symbol, t.lastMarketCapSol, Date.now(), t.meta.image);
       log('info', `ALERT sent: $${t.event.symbol} score ${score}`);
     } else {
-      log('error', `telegram send failed for ${t.event.mint}; payload:\n${text}`);
+      log('error', `telegram send failed for ${t.event.mint}; payload:\n${caption}`);
     }
   } catch (err) {
     log('error', `handleTrigger ${t.event.mint}: ${(err as Error).message}`);

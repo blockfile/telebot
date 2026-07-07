@@ -45,6 +45,19 @@ export interface LaunchConfig {
 export interface FollowUpConfig {
   windowMinutes: number;
   dumpAlertPct: number;
+  milestones: number[];
+}
+
+export interface BuyButton {
+  label: string;
+  url: string; // may contain {CA}, replaced with the token mint
+}
+
+export interface ButtonsConfig {
+  buy: BuyButton[];
+  chart: boolean;
+  scan: boolean;
+  pumpfun: boolean;
 }
 
 export interface AppConfig {
@@ -53,6 +66,7 @@ export interface AppConfig {
   deep: DeepConfig;
   launch: LaunchConfig;
   followUp: FollowUpConfig;
+  buttons: ButtonsConfig;
   alertScoreThreshold: number;
   solPriceFallbackUsd: number;
   summaryHourLocal: number;
@@ -107,6 +121,16 @@ export function loadConfig(path = 'config.json'): AppConfig {
   }
   if (typeof cfg.stage1?.requireTelegramOrWebsite !== 'boolean') {
     throw new Error('config.json missing boolean field: stage1.requireTelegramOrWebsite');
+  }
+  if (!Array.isArray(cfg.followUp?.milestones) || cfg.followUp.milestones.length === 0
+      || cfg.followUp.milestones.some((m) => typeof m !== 'number')) {
+    throw new Error('config.json missing number array: followUp.milestones');
+  }
+  if (!cfg.buttons || !Array.isArray(cfg.buttons.buy)
+      || typeof cfg.buttons.chart !== 'boolean'
+      || typeof cfg.buttons.scan !== 'boolean'
+      || typeof cfg.buttons.pumpfun !== 'boolean') {
+    throw new Error('config.json missing buttons config (buy[], chart, scan, pumpfun)');
   }
   return cfg;
 }
