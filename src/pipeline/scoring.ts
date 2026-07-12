@@ -14,9 +14,12 @@ export interface CheckResults {
   bundlePct: Unknown<number>;
   first20Pct: Unknown<number>;
   devOutflowPct: Unknown<number>;
-  // display-only (not scored): sniper activity and holder count
+  // display-only (not scored): sniper activity, insider held-trend, holder count
   sniperCount: Unknown<number>;
   sniperPct: Unknown<number>;
+  sniperHeldPct: Unknown<number>;
+  bundleCount: Unknown<number>;
+  bundleHeldPct: Unknown<number>;
   holderCount: Unknown<number>;
 }
 

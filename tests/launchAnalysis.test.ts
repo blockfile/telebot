@@ -18,6 +18,7 @@ function fakeRpc(h: {
   curveSigs: Array<{ signature: string; slot: number }>;
   txBySig: Record<string, unknown>;
   devSigs?: Array<{ signature: string; slot: number }>;
+  heldByOwner?: Record<string, number>; // current uiAmount balance per wallet
 }): Rpc {
   return {
     call: async (method: string, params: unknown[]) => {
@@ -31,6 +32,11 @@ function fakeRpc(h: {
         // newest-first
         if (addr === CURVE) return [...h.curveSigs].reverse();
         if (addr === DEV) return [...(h.devSigs ?? [])].reverse();
+      }
+      if (method === 'getTokenAccountsByOwner') {
+        const owner = params[0] as string;
+        if (!h.heldByOwner || !(owner in h.heldByOwner)) throw new Error('no balance for ' + owner);
+        return { value: [{ account: { data: { parsed: { info: { tokenAmount: { uiAmount: h.heldByOwner[owner] } } } } } }] };
       }
       throw new Error('unexpected ' + method);
     },
@@ -85,6 +91,135 @@ describe('analyzeLaunch', () => {
     expect(r.sniperCount).toBe(2);              // sniperW1 + sniperW2
     expect(r.sniperPct).toBeCloseTo(5, 5);      // (30M + 20M) / 1B
     expect(r.bundlePct).toBeCloseTo(4, 5);      // bundlerW 40M (unchanged by sniper logic)
+  });
+
+  it('paginates back to the creation signature when the curve has more than one page of history', async () => {
+    // 1500 sigs newer than creation: page 1 = 1000 (full -> keep paging), page 2 = 500 (short -> reached creation)
+    const calls: Array<Record<string, unknown>> = [];
+    const early = [
+      { signature: 'b1', slot: 100 }, // creation-slot bundle buy
+      { signature: 'b2', slot: 105 },
+    ];
+    const filler = Array.from({ length: 1498 }, (_, i) => ({ signature: `f${i}`, slot: 200 + i }));
+    const all = [...early, ...filler]; // chronological
+    const newestFirst = [...all].reverse();
+    const rpc = {
+      call: async (method: string, params: unknown[]) => {
+        if (method === 'getTransaction') {
+          const sig = params[0] as string;
+          if (sig === 'create') return { slot: 100 };
+          if (sig === 'b1') return buy('bundlerW', 50_000_000);
+          if (sig === 'b2') return buy('lateW', 10_000_000);
+          return null;
+        }
+        if (method === 'getSignaturesForAddress') {
+          const addr = params[0] as string;
+          if (addr === DEV) return [];
+          const opts = params[1] as Record<string, unknown>;
+          calls.push(opts);
+          const start = opts.before ? newestFirst.findIndex((s) => s.signature === opts.before) + 1 : 0;
+          return newestFirst.slice(start, start + 1000);
+        }
+        if (method === 'getTokenAccountsByOwner') throw new Error('no balances in this test');
+        throw new Error('unexpected ' + method);
+      },
+    } as unknown as Rpc;
+
+    const r = await analyzeLaunch(rpc, MINT, CURVE, DEV, 'create', 60, 3, 15);
+    expect(r).not.toBe('unknown');
+    if (r === 'unknown') return;
+    expect(calls.length).toBe(2);                        // two pages walked
+    expect(calls[1].before).toBeDefined();               // second page anchored on the first page's oldest sig
+    expect(r.bundlePct).toBeCloseTo(5, 5);               // earliest txs reached across the page boundary
+  });
+
+  it("returns 'unknown' when the page cap is exhausted before reaching creation (token too hot)", async () => {
+    const page = Array.from({ length: 1000 }, (_, i) => ({ signature: `p${i}`, slot: 500 + i }));
+    const rpc = {
+      call: async (method: string, params: unknown[]) => {
+        if (method === 'getTransaction') return { slot: 100 };
+        if (method === 'getSignaturesForAddress') return page; // always a full page, never reaches creation
+        throw new Error('unexpected ' + method);
+      },
+    } as unknown as Rpc;
+    expect(await analyzeLaunch(rpc, MINT, CURVE, DEV, 'create', 60, 3, 2)).toBe('unknown');
+  });
+
+  it('computes bundle/sniper held percentages from current insider balances', async () => {
+    const rpc = fakeRpc({
+      createSlot: 100,
+      curveSigs: [
+        { signature: 'create', slot: 100 },
+        { signature: 'bund', slot: 100 },   // bundler: bought 50M
+        { signature: 'snip', slot: 102 },    // sniper: bought 30M
+      ],
+      txBySig: { bund: buy('bundlerW', 50_000_000), snip: buy('sniperW', 30_000_000) },
+      heldByOwner: { bundlerW: 10_000_000, sniperW: 30_000_000 }, // bundler dumped 80%, sniper holds all
+      devSigs: [],
+    });
+    const r = await analyzeLaunch(rpc, MINT, CURVE, DEV, 'create', 60, 3, 15);
+    expect(r).not.toBe('unknown');
+    if (r === 'unknown') return;
+    expect(r.bundleCount).toBe(1);
+    expect(r.bundlePct).toBeCloseTo(5, 5);        // bought 50M/1B
+    expect(r.bundleHeldPct).toBeCloseTo(1, 5);    // holds 10M/1B
+    expect(r.sniperPct).toBeCloseTo(3, 5);        // bought 30M/1B
+    expect(r.sniperHeldPct).toBeCloseTo(3, 5);    // still holds 30M/1B
+  });
+
+  it("a PARTIAL balance-lookup failure degrades that group to 'unknown' rather than faking a dump", async () => {
+    const rpc = fakeRpc({
+      createSlot: 100,
+      curveSigs: [
+        { signature: 'create', slot: 100 },
+        { signature: 'bund1', slot: 100 },
+        { signature: 'bund2', slot: 100 },
+      ],
+      txBySig: { bund1: buy('bw1', 50_000_000), bund2: buy('bw2', 40_000_000) },
+      heldByOwner: { bw1: 50_000_000 }, // bw2's lookup throws — must NOT count as "holds 0"
+      devSigs: [],
+    });
+    const r = await analyzeLaunch(rpc, MINT, CURVE, DEV, 'create', 60, 3, 15);
+    expect(r).not.toBe('unknown');
+    if (r === 'unknown') return;
+    expect(r.bundlePct).toBeCloseTo(9, 5);
+    expect(r.bundleHeldPct).toBe('unknown'); // honest "9% → ?" instead of a false dump trend
+  });
+
+  it("insiders beyond the lookup cap degrade their group to 'unknown' instead of counting as dumped", async () => {
+    const n = 21; // one more than MAX_HOLDS_LOOKUPS
+    const curveSigs = [
+      { signature: 'create', slot: 100 },
+      ...Array.from({ length: n }, (_, i) => ({ signature: `s${i}`, slot: 101 })), // all snipers
+    ];
+    const txBySig: Record<string, unknown> = {};
+    const heldByOwner: Record<string, number> = {};
+    for (let i = 0; i < n; i++) {
+      txBySig[`s${i}`] = buy(`sw${i}`, 1_000_000);
+      heldByOwner[`sw${i}`] = 1_000_000; // everyone still holds — but only 20 get looked up
+    }
+    const rpc = fakeRpc({ createSlot: 100, curveSigs, txBySig, heldByOwner, devSigs: [] });
+    const r = await analyzeLaunch(rpc, MINT, CURVE, DEV, 'create', 60, 3, 15);
+    expect(r).not.toBe('unknown');
+    if (r === 'unknown') return;
+    expect(r.sniperCount).toBe(n);
+    expect(r.sniperHeldPct).toBe('unknown'); // 21st wallet unsampled — don't report a fake trim
+    expect(r.bundleHeldPct).toBe(0);         // no bundlers at all -> exact 0, not unknown
+  });
+
+  it("held percentages degrade to 'unknown' when balance lookups fail, without failing the analysis", async () => {
+    const rpc = fakeRpc({
+      createSlot: 100,
+      curveSigs: [{ signature: 'create', slot: 100 }, { signature: 'bund', slot: 100 }],
+      txBySig: { bund: buy('bundlerW', 50_000_000) },
+      // heldByOwner omitted -> getTokenAccountsByOwner throws for every wallet
+      devSigs: [],
+    });
+    const r = await analyzeLaunch(rpc, MINT, CURVE, DEV, 'create', 60, 3, 15);
+    expect(r).not.toBe('unknown');
+    if (r === 'unknown') return;
+    expect(r.bundlePct).toBeCloseTo(5, 5);
+    expect(r.bundleHeldPct).toBe('unknown');
   });
 
   it("returns 'unknown' when the earliest captured slot is newer than creation (launch missed)", async () => {

@@ -19,7 +19,8 @@ const clean = (over: Partial<CheckResults> = {}): CheckResults => ({
   twitterAlive: true, telegramAlive: true, websiteAlive: true,
   xExists: true, devStillHolds: true,
   bundlePct: 5, first20Pct: 20, devOutflowPct: 0,
-  sniperCount: 'unknown', sniperPct: 'unknown', holderCount: 'unknown',
+  sniperCount: 'unknown', sniperPct: 'unknown', sniperHeldPct: 'unknown',
+  bundleCount: 'unknown', bundleHeldPct: 'unknown', holderCount: 'unknown',
   ...over,
 });
 

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { FollowUps, type FollowUp, type FollowUpEvent } from '../src/pipeline/followups';
 import type { TradeEvent } from '../src/types';
 
-const CFG = { windowMinutes: 60, dumpAlertPct: 50, milestones: [2, 5, 10] };
+const CFG = { windowMinutes: 60, dumpAlertPct: 50, milestones: [2, 5, 10], liveEditSec: 45 };
 const trade = (mint: string, marketCapSol: number): TradeEvent =>
   ({ mint, trader: 't', isBuy: true, tokenAmount: 1, solAmount: 1, marketCapSol, vSolInBondingCurve: 30, signature: 's', receivedAt: 0 });
 

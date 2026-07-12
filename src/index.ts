@@ -14,7 +14,10 @@ import { fetchDevHistory } from './checks/devHistory';
 import { fetchTop10Pct, fetchHolderCount } from './checks/holders';
 import { analyzeLaunch } from './checks/launchAnalysis';
 import { FollowUps } from './pipeline/followups';
-import { Telegram, formatAlert, formatFollowUp, buildButtons, type FollowUpData, type Keyboard } from './telegram';
+import {
+  Telegram, formatAlert, formatFollowUp, buildButtons,
+  type AlertData, type FollowUpData, type Keyboard, type SendResult,
+} from './telegram';
 import { maybeSendSummary } from './summary';
 import { log } from './logger';
 import { TOTAL_SUPPLY, type NewTokenEvent, type TradeEvent, type MigrationEvent } from './types';
@@ -29,11 +32,11 @@ const telegram = new Telegram(secrets.telegramBotToken, secrets.telegramChatId);
 const solPrice = new SolPrice(cfg.solPriceFallbackUsd);
 const stream = new PumpPortalStream(secrets.pumpportalApiKey);
 
-async function send(payload: string | { text: string; photoUrl?: string; buttons?: Keyboard }): Promise<boolean> {
+async function send(payload: string | { text: string; photoUrl?: string; buttons?: Keyboard }): Promise<SendResult> {
   const p = typeof payload === 'string' ? { text: payload } : payload;
   if (DRY) {
     log('info', `[DRY ALERT]${p.photoUrl ? ' [photo]' : ''}${p.buttons?.length ? ' [buttons]' : ''}\n${p.text}`);
-    return true;
+    return { ok: true }; // no messageId in dry mode -> live edits are naturally skipped
   }
   return telegram.send(p);
 }
@@ -65,26 +68,33 @@ const followUps = new FollowUps(cfg.followUp, {
   subscribe: (m) => stream.subscribeTrades(m),
   unsubscribe: (m) => stream.unsubscribeTrades(m),
   fire: (fu, event) => {
-    let data: FollowUpData;
-    if (event.kind === 'up') {
-      // Show the level for THIS milestone (fromUsd × multiple), not the shared live peak —
-      // otherwise a single trade that jumps through several milestones prints identical $ on each card.
-      data = {
-        kind: 'up', symbol: fu.symbol, mint: fu.mint, multiple: event.multiple,
-        fromUsd: fu.alertMcSol * solPrice.usd, peakUsd: fu.alertMcSol * event.multiple * solPrice.usd,
-      };
-    } else {
-      const nowPct = fu.alertMcSol > 0 ? ((fu.lastMcSol - fu.alertMcSol) / fu.alertMcSol) * 100 : 0;
-      const peakPct = fu.alertMcSol > 0 ? ((fu.peakMcSol - fu.alertMcSol) / fu.alertMcSol) * 100 : 0;
-      data = {
-        kind: event.kind, symbol: fu.symbol, mint: fu.mint,
-        peakUsd: fu.peakMcSol * solPrice.usd, nowUsd: fu.lastMcSol * solPrice.usd, peakPct, nowPct,
-      };
-    }
-    const photoUrl = fu.image ? ipfsToHttp(fu.image) : undefined;
-    const buttons = buildButtons(fu.mint, cfg.buttons, { web: ['chart', 'pumpfun'] });
-    void send({ text: formatFollowUp(data), photoUrl, buttons })
-      .then((ok) => { if (!ok) log('error', `follow-up send failed for ${fu.mint}`); });
+    void (async () => {
+      // Re-measure top-10 concentration so every follow-up shows whether whales are distributing.
+      const top10Now = fu.bondingCurveKey ? await fetchTop10Pct(rpc, fu.mint, fu.bondingCurveKey) : 'unknown';
+      const trend = { top10From: fu.top10AtAlert, top10Now };
+      let data: FollowUpData;
+      if (event.kind === 'up') {
+        // Show the level for THIS milestone (fromUsd × multiple), not the shared live peak —
+        // otherwise a single trade that jumps through several milestones prints identical $ on each card.
+        data = {
+          kind: 'up', symbol: fu.symbol, mint: fu.mint, multiple: event.multiple,
+          fromUsd: fu.alertMcSol * solPrice.usd, peakUsd: fu.alertMcSol * event.multiple * solPrice.usd,
+          ...trend,
+        };
+      } else {
+        const nowPct = fu.alertMcSol > 0 ? ((fu.lastMcSol - fu.alertMcSol) / fu.alertMcSol) * 100 : 0;
+        const peakPct = fu.alertMcSol > 0 ? ((fu.peakMcSol - fu.alertMcSol) / fu.alertMcSol) * 100 : 0;
+        data = {
+          kind: event.kind, symbol: fu.symbol, mint: fu.mint,
+          peakUsd: fu.peakMcSol * solPrice.usd, nowUsd: fu.lastMcSol * solPrice.usd, peakPct, nowPct,
+          ...trend,
+        };
+      }
+      const photoUrl = fu.image ? ipfsToHttp(fu.image) : undefined;
+      const buttons = buildButtons(fu.mint, cfg.buttons, { web: ['chart', 'pumpfun'] });
+      const r = await send({ text: formatFollowUp(data), photoUrl, buttons });
+      if (!r.ok) log('error', `follow-up send failed for ${fu.mint}`);
+    })().catch((err) => log('error', `follow-up fire ${fu.mint}: ${(err as Error).message}`));
     log('info', `follow-up (${event.kind}${event.kind === 'up' ? ` ${event.multiple}X` : ''}) $${fu.symbol}`);
   },
 });
@@ -125,6 +135,7 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
     if (db.alertExists(t.event.mint)) return;
     db.setOutcome(t.event.mint, 'triggered');
     log('info', `triggered $${t.event.symbol} (${t.event.mint}) — running deep checks`);
+    const deepStart = Date.now();
 
     const results = await runDeepChecks(t, {
       fetchDevHistory: (creator, mint) => fetchDevHistory(
@@ -140,6 +151,7 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
         analyzeLaunch(rpc, mint, bondingCurveKey, creator, creationSignature, cfg.launch.maxEarlyTxFetch, cfg.launch.sniperSlots),
       fetchHolderCount: (mint, curve) => fetchHolderCount(rpc, mint, curve),
     });
+    log('info', `deep checks for $${t.event.symbol} took ${Date.now() - deepStart}ms`);
 
     if (results.devHistory === 'unknown' || results.top10Pct === 'unknown') {
       db.setOutcome(t.event.mint, 'rejected_deep');
@@ -154,7 +166,7 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
       return;
     }
 
-    const caption = formatAlert({
+    const alertData: AlertData = {
       mint: t.event.mint, name: t.event.name, symbol: t.event.symbol, score, flags,
       marketCapUsd: t.lastMarketCapSol * solPrice.usd,
       topMarketCapUsd: t.peakMarketCapSol * solPrice.usd,
@@ -163,24 +175,39 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
       ageMinutes: Math.round((Date.now() - t.addedAt) / 60_000),
       uniqueBuyers: t.buyers.size,
       holderCount: results.holderCount,
+      feesSol: t.volumeSol * 0.01, // pump.fun takes ~1% of traded volume
       devBuyPct: (t.event.devBuyTokens / TOTAL_SUPPLY) * 100,
       devStillHolds: !t.devSold,
       priorLaunches: results.devHistory.priorLaunches,
       top10Pct: results.top10Pct,
       bundlePct: results.bundlePct,
+      bundleCount: results.bundleCount,
+      bundleHeldPct: results.bundleHeldPct,
       sniperCount: results.sniperCount,
       sniperPct: results.sniperPct,
+      sniperHeldPct: results.sniperHeldPct,
       first20Pct: results.first20Pct,
       devOutflowPct: results.devOutflowPct,
       twitter: t.meta.twitter, telegram: t.meta.telegram, website: t.meta.website,
-    });
+    };
+    const caption = formatAlert(alertData);
     const photoUrl = t.meta.image ? ipfsToHttp(t.meta.image) : undefined;
     const buttons = buildButtons(t.event.mint, cfg.buttons);
 
-    if (await send({ text: caption, photoUrl, buttons })) {
+    const sent = await send({ text: caption, photoUrl, buttons });
+    if (sent.ok) {
       db.recordAlert(t.event.mint, score, DRY, caption, Date.now());
       db.setOutcome(t.event.mint, 'alerted');
-      followUps.add(t.event.mint, t.event.symbol, t.lastMarketCapSol, Date.now(), t.meta.image);
+      followUps.add(
+        t.event.mint, t.event.symbol, t.lastMarketCapSol, Date.now(),
+        t.meta.image, t.event.bondingCurveKey, results.top10Pct,
+      );
+      if (sent.messageId !== undefined && cfg.followUp.liveEditSec > 0) {
+        liveCards.set(t.event.mint, {
+          messageId: sent.messageId, photo: sent.photo === true,
+          data: alertData, buttons, alertMcSol: t.lastMarketCapSol, startedAt: Date.now(), failCount: 0,
+        });
+      }
       log('info', `ALERT sent: $${t.event.symbol} score ${score}`);
     } else {
       log('error', `telegram send failed for ${t.event.mint}; payload:\n${caption}`);
@@ -189,6 +216,55 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
     log('error', `handleTrigger ${t.event.mint}: ${(err as Error).message}`);
     db.setOutcome(t.event.mint, 'rejected_deep');
   }
+}
+
+// --- Live cards: the alert message edits itself with the current MC/multiple while the
+// --- follow-up tracker still has fresh trade data for the token.
+interface LiveCard {
+  messageId: number;
+  photo: boolean;
+  data: AlertData;
+  buttons: Keyboard;
+  alertMcSol: number;
+  startedAt: number;
+  failCount: number;
+}
+const liveCards = new Map<string, LiveCard>();
+
+async function tickLiveCards(): Promise<void> {
+  for (const [mint, card] of [...liveCards]) {
+    const fu = followUps.get(mint);
+    const expired = Date.now() - card.startedAt > cfg.followUp.windowMinutes * 60_000;
+    if (!fu || expired) {
+      // Tracking ended (dump/window). Freeze the card honestly: one final edit that drops the
+      // stale "Now" line, so a dumped token doesn't keep displaying its peak forever.
+      liveCards.delete(mint);
+      void telegram.editCaption(card.messageId, formatAlert(card.data), card.buttons, card.photo);
+      continue;
+    }
+    const nowUsd = fu.lastMcSol * solPrice.usd;
+    const multiple = card.alertMcSol > 0 ? fu.lastMcSol / card.alertMcSol : 0;
+    const caption = formatAlert({ ...card.data, live: { nowUsd, multiple } });
+    const ok = await telegram.editCaption(card.messageId, caption, card.buttons, card.photo);
+    if (ok) {
+      card.failCount = 0;
+    } else if (++card.failCount >= 3) {
+      // Transient blips (a 429, one timeout) are retried by the next tick; only give up
+      // after repeated consecutive failures (e.g. the message was deleted).
+      log('warn', `live edit failed ${card.failCount}x for ${mint} — stopping live updates for this card`);
+      liveCards.delete(mint);
+    }
+  }
+}
+
+if (cfg.followUp.liveEditSec > 0 && !DRY) {
+  let ticking = false; // re-entrancy guard: a slow tick must not overlap the next one
+  const t = setInterval(() => {
+    if (ticking) return;
+    ticking = true;
+    void tickLiveCards().finally(() => { ticking = false; });
+  }, cfg.followUp.liveEditSec * 1000);
+  t.unref();
 }
 
 solPrice.start();
@@ -203,6 +279,10 @@ stream.on('migration', (m: MigrationEvent) => {
     db.bumpDev(creator, 'graduated', Date.now());
     log('info', `graduated: ${m.mint} (dev ${creator})`);
   }
+  // After migration the supply moves to the AMM pool vault, which fetchTop10Pct would
+  // wrongly count as a whale. Blank the curve key so later follow-ups skip the re-measure.
+  const fu = followUps.get(m.mint);
+  if (fu) fu.bondingCurveKey = '';
 });
 stream.on('status', (s: string) => log('info', `stream: ${s}`));
 stream.connect();
@@ -215,7 +295,7 @@ setInterval(() => {
 
 let lastSummaryDay = -1;
 setInterval(() => {
-  void maybeSendSummary(db, send, cfg.summaryHourLocal, new Date(), lastSummaryDay)
+  void maybeSendSummary(db, (text) => send(text).then((r) => r.ok), cfg.summaryHourLocal, new Date(), lastSummaryDay)
     .then((d) => { lastSummaryDay = d; });
 }, 60_000);
 

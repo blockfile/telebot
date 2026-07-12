@@ -17,7 +17,11 @@ const deps = (over: Partial<DeepCheckDeps> = {}): DeepCheckDeps => ({
   fetchTop10Pct: async () => 22,
   checkUrlAlive: async () => true,
   checkXExists: async () => true,
-  analyzeLaunch: async () => ({ bundlePct: 8, sniperCount: 4, sniperPct: 12, first20Pct: 31, devOutflowPct: 0 }),
+  analyzeLaunch: async () => ({
+    bundlePct: 8, bundleCount: 3, bundleHeldPct: 3,
+    sniperCount: 4, sniperPct: 12, sniperHeldPct: 4,
+    first20Pct: 31, devOutflowPct: 0,
+  }),
   fetchHolderCount: async () => 341,
   ...over,
 });
@@ -31,7 +35,8 @@ describe('runDeepChecks', () => {
       twitterAlive: true, telegramAlive: true, websiteAlive: true,
       xExists: true, devStillHolds: true,
       bundlePct: 8, first20Pct: 31, devOutflowPct: 0,
-      sniperCount: 4, sniperPct: 12, holderCount: 341,
+      sniperCount: 4, sniperPct: 12, sniperHeldPct: 4,
+      bundleCount: 3, bundleHeldPct: 3, holderCount: 341,
     });
   });
 

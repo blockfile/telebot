@@ -28,10 +28,12 @@ describe('buildButtons', () => {
 const DATA: AlertData = {
   mint: 'MintPubkey111', name: 'Cool <Token>', symbol: 'COOL', score: 74,
   flags: ['top10 35%'], marketCapUsd: 18400, topMarketCapUsd: 24000, volumeUsd: 27600,
-  liquidityUsd: 12300, ageMinutes: 23, uniqueBuyers: 41, holderCount: 341,
+  liquidityUsd: 12300, ageMinutes: 23, uniqueBuyers: 41, holderCount: 341, feesSol: 1.4,
   devBuyPct: 2.1, devStillHolds: true, priorLaunches: 0, top10Pct: 21,
   twitter: 'https://x.com/dev', telegram: 'https://t.me/c', website: undefined,
-  bundlePct: 8, sniperCount: 5, sniperPct: 12, first20Pct: 31, devOutflowPct: 0,
+  bundlePct: 8, bundleCount: 3, bundleHeldPct: 3,
+  sniperCount: 5, sniperPct: 12, sniperHeldPct: 4,
+  first20Pct: 31, devOutflowPct: 0,
 };
 
 describe('escapeHtml', () => {
@@ -43,18 +45,33 @@ describe('escapeHtml', () => {
 describe('formatAlert', () => {
   it('renders the full alert with escaped name, copyable CA, links, and flags', () => {
     const text = formatAlert(DATA);
-    expect(text).toContain('⚡ <b>$COOL</b> — score 74/100'); // 74 -> ⚡ (grade tested separately)
-    expect(text).toContain('Cool &lt;Token&gt;');
-    expect(text).toContain('💰 MC $18.4k (top $24.0k) · 📊 Vol $27.6k · ⏱️ 23m');
-    expect(text).toContain('💧 Liq $12.3k · 👥 41 buyers · 🙋 341 holders');
+    expect(text).toContain('⚡ <b>$COOL</b> • Cool &lt;Token&gt;'); // 74 -> ⚡ (grade tested separately)
+    expect(text).toContain('⭐ Score: 74/100 | ⏱ 23m');
+    expect(text).toContain('💰 MC: $18.4k • ⇡ top $24.0k');
+    expect(text).toContain('💧 Liq: $12.3k');
+    expect(text).toContain('📊 Vol: $27.6k • 🪙 ~1.4 SOL fees');
+    expect(text).toContain('👥 Hodls: 341 | Buyers: 41');
     expect(text).toContain('<code>MintPubkey111</code>'); // CA is tap-to-copy
-    expect(text).toContain('🧑‍💻 Dev: 2.1% · still holds · 0 priors');
+    expect(text).toContain('📦 Bundles: 3 • 8% → 3% 🟡'); // held 3/8 = 37% -> trimming
+    expect(text).toContain('🔫 Snipers: 5 • 12% → 4% 🟡');
+    expect(text).toContain('🎯 First 20: 31%');
+    expect(text).toContain('🛠 Dev: 2.1% | Out: 0% | Priors: 0');
     expect(text).toContain('🏆 Top 10: 21%');
-    expect(text).toContain('🔗 𝕏 ✅   TG ✅   Web ❌');
-    expect(text).toContain('🎯 Bundle 8% · Snipers 5 (12%) · First-20 31% · Dev-out 0%');
+    expect(text).toContain('🐦 X ✅ | TG ✅ | Web ❌');
     expect(text).toContain('⚠️ top10 35%');
+    expect(text).not.toContain('📈 Now:'); // no live line unless live data is passed
     // links are now buttons, not inline text in the caption
     expect(text).not.toContain('href=');
+  });
+
+  it('renders the live Now line and held-trend emojis', () => {
+    const live = formatAlert({ ...DATA, live: { nowUsd: 48200, multiple: 3.1 } });
+    expect(live).toContain('📈 Now: $48.2k • 3.1X');
+    // holding (>=70%) and dumped (<30%) trends
+    expect(formatAlert({ ...DATA, bundlePct: 10, bundleHeldPct: 9 })).toContain('📦 Bundles: 3 • 10% → 9% 💚');
+    expect(formatAlert({ ...DATA, bundlePct: 10, bundleHeldPct: 1 })).toContain('📦 Bundles: 3 • 10% → 1% 🔻');
+    expect(formatAlert({ ...DATA, bundlePct: 0, bundleHeldPct: 0, bundleCount: 0 })).toContain('📦 Bundles: 0 • 0%\n');
+    expect(formatAlert({ ...DATA, bundlePct: 8, bundleHeldPct: 'unknown' })).toContain('📦 Bundles: 3 • 8% → ?');
   });
 
   it('picks the lead emoji from the score', () => {
@@ -65,15 +82,22 @@ describe('formatAlert', () => {
 
   it('renders unknowns as ? and omits flag line when empty', () => {
     const text = formatAlert({ ...DATA, priorLaunches: 'unknown', top10Pct: 'unknown', holderCount: 'unknown', flags: [] });
-    expect(text).toContain('· ? priors');
+    expect(text).toContain('Priors: ?');
     expect(text).toContain('🏆 Top 10: ?');
-    expect(text).toContain('🙋 ? holders');
+    expect(text).toContain('👥 Hodls: ? | Buyers: 41');
     expect(text).not.toContain('⚠️');
   });
 
   it('renders unknown launch values as ?', () => {
-    const text = formatAlert({ ...DATA, bundlePct: 'unknown', sniperCount: 'unknown', sniperPct: 'unknown', first20Pct: 'unknown', devOutflowPct: 'unknown' });
-    expect(text).toContain('🎯 Bundle ? · Snipers ? · First-20 ? · Dev-out ?');
+    const text = formatAlert({
+      ...DATA, bundlePct: 'unknown', bundleCount: 'unknown', bundleHeldPct: 'unknown',
+      sniperCount: 'unknown', sniperPct: 'unknown', sniperHeldPct: 'unknown',
+      first20Pct: 'unknown', devOutflowPct: 'unknown',
+    });
+    expect(text).toContain('📦 Bundles: ?');
+    expect(text).toContain('🔫 Snipers: ?');
+    expect(text).toContain('🎯 First 20: ?');
+    expect(text).toContain('Out: ?');
   });
 });
 
@@ -90,6 +114,19 @@ describe('formatFollowUp', () => {
     const s = formatFollowUp({ kind: 'up', symbol: 'X', mint: 'm', multiple: 100, fromUsd: 1000, peakUsd: 100000 });
     expect(s).toContain('is up 100X');
     expect((s.match(/🚀/g) ?? []).length).toBe(10);
+  });
+
+  it('appends a top-10 trend line when both measurements are known, omits it otherwise', () => {
+    const withTrend = formatFollowUp({
+      kind: 'up', symbol: 'PAM', mint: 'm', multiple: 2, fromUsd: 1000, peakUsd: 2000,
+      top10From: 28, top10Now: 21,
+    });
+    expect(withTrend).toContain('🏆 Top10 28% → 21%');
+    const noTrend = formatFollowUp({
+      kind: 'window', symbol: 'C', mint: 'm', peakUsd: 1, nowUsd: 1, peakPct: 0, nowPct: 0,
+      top10From: 28, top10Now: 'unknown',
+    });
+    expect(noTrend).not.toContain('🏆');
   });
 
   it('renders a window recap with peak and current performance', () => {
@@ -112,8 +149,8 @@ describe('Telegram', () => {
       captured = { url: String(url), body: String(init?.body) };
       return new Response('{"ok":true}', { status: 200 });
     }) as unknown as typeof fetch;
-    const ok = await new Telegram('TOKEN', '42', f).send('hello');
-    expect(ok).toBe(true);
+    const r = await new Telegram('TOKEN', '42', f).send('hello');
+    expect(r.ok).toBe(true);
     expect(captured!.url).toBe('https://api.telegram.org/botTOKEN/sendMessage');
     const body = JSON.parse(captured!.body);
     expect(body).toMatchObject({ chat_id: '42', text: 'hello', parse_mode: 'HTML' });
@@ -122,7 +159,7 @@ describe('Telegram', () => {
   it('returns false after 3 failures without throwing', async () => {
     let calls = 0;
     const f = (async () => { calls++; return new Response('err', { status: 400 }); }) as unknown as typeof fetch;
-    expect(await new Telegram('T', '1', f).send('x')).toBe(false);
+    expect((await new Telegram('T', '1', f).send('x')).ok).toBe(false);
     expect(calls).toBe(3);
   });
 
@@ -130,11 +167,11 @@ describe('Telegram', () => {
     const captured: Array<{ url: string; body: any }> = [];
     const f = (async (url: RequestInfo | URL, init?: RequestInit) => {
       captured.push({ url: String(url), body: JSON.parse(String(init?.body)) });
-      return new Response('{"ok":true}', { status: 200 });
+      return new Response('{"ok":true,"result":{"message_id":777}}', { status: 200 });
     }) as unknown as typeof fetch;
     const buttons = [[{ text: 'Chart', url: 'https://c' }]];
-    const ok = await new Telegram('T', '42', f).send({ text: 'cap', photoUrl: 'https://img', buttons });
-    expect(ok).toBe(true);
+    const r = await new Telegram('T', '42', f).send({ text: 'cap', photoUrl: 'https://img', buttons });
+    expect(r).toMatchObject({ ok: true, messageId: 777, photo: true });
     expect(captured).toHaveLength(1);
     expect(captured[0].url).toBe('https://api.telegram.org/botT/sendPhoto');
     expect(captured[0].body).toMatchObject({
@@ -153,8 +190,9 @@ describe('Telegram', () => {
         ? new Response('{"ok":false,"description":"wrong file"}', { status: 400 })
         : new Response('{"ok":true}', { status: 200 });
     }) as unknown as typeof fetch;
-    const ok = await new Telegram('T', '1', f).send({ text: 'cap', photoUrl: 'https://bad' });
-    expect(ok).toBe(true);
+    const r = await new Telegram('T', '1', f).send({ text: 'cap', photoUrl: 'https://bad' });
+    expect(r.ok).toBe(true);
+    expect(r.photo).toBe(false); // delivered as text, so live edits must use editMessageText
     expect(urls.some((u) => u.endsWith('/sendPhoto'))).toBe(true);
     expect(urls.some((u) => u.endsWith('/sendMessage'))).toBe(true);
   });
@@ -169,9 +207,42 @@ describe('Telegram', () => {
       return new Response('{"ok":true}', { status: 200 });
     }) as unknown as typeof fetch;
     const start = Date.now();
-    const ok = await new Telegram('T', '1', f).send('x');
-    expect(ok).toBe(true);
+    const r = await new Telegram('T', '1', f).send('x');
+    expect(r.ok).toBe(true);
     expect(calls).toBe(2);
     expect(Date.now() - start).toBeGreaterThanOrEqual(900); // waited (0 + 1)s
   }, 10_000);
+
+  it('editCaption edits a photo card via editMessageCaption and resends the buttons', async () => {
+    const captured: Array<{ url: string; body: any }> = [];
+    const f = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      captured.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+      return new Response('{"ok":true}', { status: 200 });
+    }) as unknown as typeof fetch;
+    const buttons = [[{ text: 'Chart', url: 'https://c' }]];
+    const ok = await new Telegram('T', '42', f).editCaption(777, 'updated', buttons, true);
+    expect(ok).toBe(true);
+    expect(captured[0].url).toBe('https://api.telegram.org/botT/editMessageCaption');
+    expect(captured[0].body).toMatchObject({
+      chat_id: '42', message_id: 777, caption: 'updated', parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: buttons }, // an edit without reply_markup drops the buttons
+    });
+  });
+
+  it('editCaption edits a text card via editMessageText', async () => {
+    let url = '';
+    const f = (async (u: RequestInfo | URL) => { url = String(u); return new Response('{"ok":true}', { status: 200 }); }) as unknown as typeof fetch;
+    expect(await new Telegram('T', '1', f).editCaption(5, 'x', [], false)).toBe(true);
+    expect(url).toBe('https://api.telegram.org/botT/editMessageText');
+  });
+
+  it("editCaption treats 'message is not modified' as success and does not retry", async () => {
+    let calls = 0;
+    const f = (async () => {
+      calls++;
+      return new Response('{"ok":false,"description":"Bad Request: message is not modified"}', { status: 400 });
+    }) as unknown as typeof fetch;
+    expect(await new Telegram('T', '1', f).editCaption(5, 'same', [], true)).toBe(true);
+    expect(calls).toBe(1);
+  });
 });

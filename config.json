@@ -40,7 +40,8 @@
   "followUp": {
     "windowMinutes": 60,
     "dumpAlertPct": 50,
-    "milestones": [2, 5, 10, 25, 50, 100]
+    "milestones": [2, 5, 10, 25, 50, 100],
+    "liveEditSec": 45
   },
   "buttons": {
     "buy": [],

@@ -168,6 +168,7 @@ All of the scanner's tunable behavior lives in `config.json` in the project fold
 | `stage1.requireTelegramOrWebsite` | Whether a token needs a Telegram group or website in addition to its Twitter/X link to pass the first filter. A Twitter/X link is always required either way. | `false` (default) = tokens that launch with only a tweet or X community can still alert — fits the current meta, roughly 2-4x more alerts. `true` = stricter, only "prepared" launches with a Telegram or website get through. |
 | `launch.bundleHardRejectPct` | The maximum percentage of supply that can be bundled (bought by insiders in the creation block) before the token is hard-rejected. | Lower = reject tokens with smaller insider bundles, stricter filtering. Higher = accept bundles up to that threshold. |
 | `followUp.windowMinutes` | How long (in minutes) after an alert the scanner tracks the token and watches for performance changes before posting a follow-up message. | Lower = faster follow-up notifications. Higher = longer tracking window catches slower movements and gives more time before reporting. |
+| `followUp.liveEditSec` | How often (in seconds) each alert card edits itself with the token's current market cap and X-multiple while it's being tracked. | Lower = fresher numbers but more Telegram API traffic. `0` turns live updating off (cards stay frozen at alert-time values). |
 
 ## 6. How scoring works
 

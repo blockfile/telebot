@@ -47,6 +47,7 @@ export interface FollowUpConfig {
   windowMinutes: number;
   dumpAlertPct: number;
   milestones: number[];
+  liveEditSec: number; // live-edit the alert card every N seconds during the window; 0 = off
 }
 
 export interface BuyButton {
@@ -114,6 +115,7 @@ export function loadConfig(path = 'config.json'): AppConfig {
     ['launch.sniperSlots', cfg.launch?.sniperSlots],
     ['followUp.windowMinutes', cfg.followUp?.windowMinutes],
     ['followUp.dumpAlertPct', cfg.followUp?.dumpAlertPct],
+    ['followUp.liveEditSec', cfg.followUp?.liveEditSec],
     ['alertScoreThreshold', cfg.alertScoreThreshold],
     ['solPriceFallbackUsd', cfg.solPriceFallbackUsd],
     ['summaryHourLocal', cfg.summaryHourLocal],

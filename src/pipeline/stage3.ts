@@ -52,6 +52,9 @@ export async function runDeepChecks(t: WatchedToken, deps: DeepCheckDeps): Promi
     devOutflowPct: launch === 'unknown' ? 'unknown' : launch.devOutflowPct,
     sniperCount: launch === 'unknown' ? 'unknown' : launch.sniperCount,
     sniperPct: launch === 'unknown' ? 'unknown' : launch.sniperPct,
+    sniperHeldPct: launch === 'unknown' ? 'unknown' : launch.sniperHeldPct,
+    bundleCount: launch === 'unknown' ? 'unknown' : launch.bundleCount,
+    bundleHeldPct: launch === 'unknown' ? 'unknown' : launch.bundleHeldPct,
     holderCount,
   };
 }

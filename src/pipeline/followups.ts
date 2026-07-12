@@ -5,6 +5,8 @@ export interface FollowUp {
   mint: string;
   symbol: string;
   image?: string;
+  bondingCurveKey: string;
+  top10AtAlert: number | 'unknown';
   alertMcSol: number;
   peakMcSol: number;
   lastMcSol: number;
@@ -33,11 +35,15 @@ export class FollowUps {
 
   get size(): number { return this.items.size; }
   has(mint: string): boolean { return this.items.has(mint); }
+  get(mint: string): FollowUp | undefined { return this.items.get(mint); }
 
-  add(mint: string, symbol: string, alertMcSol: number, now: number, image?: string): void {
+  add(
+    mint: string, symbol: string, alertMcSol: number, now: number,
+    image?: string, bondingCurveKey = '', top10AtAlert: number | 'unknown' = 'unknown',
+  ): void {
     if (this.items.has(mint)) return;
     this.items.set(mint, {
-      mint, symbol, image, alertMcSol,
+      mint, symbol, image, bondingCurveKey, top10AtAlert, alertMcSol,
       peakMcSol: alertMcSol, lastMcSol: alertMcSol, alertedAt: now, firedMilestones: [],
     });
     this.hooks.subscribe(mint);
