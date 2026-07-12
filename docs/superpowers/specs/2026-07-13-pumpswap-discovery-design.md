@@ -52,6 +52,15 @@ Same doctrine as the rest: every external fetch degrades to 'unknown'/skip with 
 
 Pure decoders (pool-creation extraction from a fixture tx, Metaplex layout decode) fully unit-tested; stream client thin-wrapper untested (live smoke); stage-1 gate + event synthesis tested; end-to-end via dry run.
 
+## Status update (2026-07-13): SHELVED after live verification
+
+Both blind spots this spec targeted are shelved by user decision. Two facts were verified live and must be respected by any future revival of this work:
+
+1. **PumpSwap pool layout (QuickNode, confirmed):** base_mint @ byte offset 43, creator @ 11, lp_mint @ 107, base_vault @ 139, quote_vault @ 171; account discriminator `f19a6d0411b16dbc`. Resolve a token's pool via `getProgramAccounts(PUMP_AMM, memcmp offset 43 = mint)`. Market cap ≈ `(quoteVaultSol / baseVaultTokens) × 1e9` SOL.
+2. **BLOCKER for post-bond revivals:** PumpPortal does **not** stream post-graduation trades. A live subscription to a graduated, actively-trading mint returned 0 trades in 40s ("Successfully subscribed to keys", then nothing). Therefore the trade-driven watchlist/traction gate (MC + volume + **buyers**) cannot function for post-bond tokens — they would re-enter, receive no trades, and expire again. A real post-bond detector needs **reserve polling** for MC + a **poll-based traction proxy** (e.g. recent pool-tx count), which is a weaker signal than the curve pipeline. User chose to shelve rather than build the lower-confidence subsystem.
+
+Direct-to-DEX launch discovery (the original goal) remains unbuilt and would still work on trade-less assumptions (poll-based), but is likewise shelved.
+
 ## Out of scope
 
 - Raydium/other AMMs; revival sweeps for DEX-launched tokens; LP-lock/burn analysis (valuable — candidate for v2: a dev who didn't lock LP can pull it).
