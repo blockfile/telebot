@@ -10,7 +10,7 @@ export interface LaunchAnalysis {
   sniperPct: number;
   sniperHeldPct: number | 'unknown';
   first20Pct: number;
-  devOutflowPct: number;
+  devOutflowPct: number | 'unknown';
 }
 
 const MAX_HOLDS_LOOKUPS = 20;
@@ -121,17 +121,23 @@ export async function analyzeLaunch(
     const bundleHeldTokens = sumHeld(bundleWallets);
     const sniperHeldTokens = sumHeld(sniperWallets);
 
-    let devOutTokens = 0;
+    let devOutTokens: number | 'unknown' = 0;
     const devSigs = await rpc.call<SigInfo[]>('getSignaturesForAddress', [creator, { limit: 1000 }]);
     if (devSigs?.length) {
       // Only the creator's activity at/after this token's creation can be an airdrop of THIS mint;
       // anchoring to the creation slot keeps a serial creator's unrelated history out of the count.
-      // (If the creator made >1000 txs since launch, the earliest transfers may fall outside this
-      //  1000-signature window and devOutflow under-counts — i.e. it could under-flag a dumping
-      //  dev. Accepted: the window is narrow, and other gates still apply.)
-      const devLaunchEra = [...devSigs].reverse().filter((s) => s.slot >= creationSlot).slice(0, maxEarlyTxFetch);
-      const devTxs = await fetchTxs(rpc, devLaunchEra);
-      for (const { tx } of devTxs) devOutTokens += devTransfersFromTx(tx, mint, creator);
+      const oldestReturned = devSigs[devSigs.length - 1];
+      if (devSigs.length === 1000 && oldestReturned.slot > creationSlot) {
+        // The creator's 1000-signature window provably doesn't reach back to the launch (common
+        // for revived tokens hours/days old with active creators). A partial count here would be
+        // a confidently wrong ~0% that silently passes the dev-outflow hard-reject — degrade
+        // honestly instead, like the bundle metrics do.
+        devOutTokens = 'unknown';
+      } else {
+        const devLaunchEra = [...devSigs].reverse().filter((s) => s.slot >= creationSlot).slice(0, maxEarlyTxFetch);
+        const devTxs = await fetchTxs(rpc, devLaunchEra);
+        for (const { tx } of devTxs) devOutTokens += devTransfersFromTx(tx, mint, creator);
+      }
     }
 
     const pct = (n: number) => (n / TOTAL_SUPPLY) * 100;
@@ -143,7 +149,7 @@ export async function analyzeLaunch(
       sniperPct: pct(sniperTokens),
       sniperHeldPct: sniperHeldTokens === 'unknown' ? 'unknown' : pct(sniperHeldTokens),
       first20Pct: pct(first20Tokens),
-      devOutflowPct: pct(devOutTokens),
+      devOutflowPct: devOutTokens === 'unknown' ? 'unknown' : pct(devOutTokens),
     };
   } catch {
     return 'unknown';

@@ -4,6 +4,21 @@ import { dirname } from 'node:path';
 
 export type Outcome = 'seen' | 'watching' | 'expired' | 'disqualified' | 'triggered' | 'rejected_deep' | 'alerted';
 
+export interface RevivalRow {
+  mint: string;
+  symbol: string;
+  name: string;
+  creator: string;
+  twitter?: string;
+  telegram?: string;
+  website?: string;
+  image?: string;
+  bondingCurve: string;
+  creationSig: string;
+  devBuyTokens: number;
+  createdAt: number;
+}
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS tokens (
   mint TEXT PRIMARY KEY,
@@ -16,10 +31,15 @@ CREATE TABLE IF NOT EXISTS tokens (
   created_at INTEGER NOT NULL,
   stage1_pass INTEGER NOT NULL,
   stage1_reason TEXT,
-  outcome TEXT NOT NULL DEFAULT 'seen'
+  outcome TEXT NOT NULL DEFAULT 'seen',
+  bonding_curve TEXT,
+  creation_sig TEXT,
+  dev_buy_tokens REAL,
+  image TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_tokens_creator ON tokens(creator, created_at);
 CREATE INDEX IF NOT EXISTS idx_tokens_symbol ON tokens(symbol COLLATE NOCASE, created_at);
+CREATE INDEX IF NOT EXISTS idx_tokens_graveyard ON tokens(created_at) WHERE stage1_pass = 1 AND outcome = 'expired';
 
 CREATE TABLE IF NOT EXISTS handles (
   handle TEXT PRIMARY KEY,
@@ -52,25 +72,77 @@ export class Db {
     this.db = new Database(path);
     this.db.pragma('journal_mode = WAL');
     this.db.exec(SCHEMA);
+    this.migrate();
+  }
+
+  /** Add columns introduced after the first release to pre-existing databases. */
+  private migrate(): void {
+    const cols = new Set(
+      (this.db.pragma('table_info(tokens)') as Array<{ name: string }>).map((c) => c.name),
+    );
+    const add = (name: string, type: string) => {
+      if (!cols.has(name)) this.db.exec(`ALTER TABLE tokens ADD COLUMN ${name} ${type}`);
+    };
+    add('bonding_curve', 'TEXT');
+    add('creation_sig', 'TEXT');
+    add('dev_buy_tokens', 'REAL');
+    add('image', 'TEXT');
   }
 
   recordToken(t: {
     mint: string; symbol: string; name: string; creator: string;
     twitter?: string; telegram?: string; website?: string;
     createdAt: number; stage1Pass: boolean; stage1Reason?: string;
+    bondingCurve?: string; creationSig?: string; devBuyTokens?: number; image?: string;
   }): void {
     this.db.prepare(`
-      INSERT OR IGNORE INTO tokens (mint, symbol, name, creator, twitter, telegram, website, created_at, stage1_pass, stage1_reason)
-      VALUES (@mint, @symbol, @name, @creator, @twitter, @telegram, @website, @createdAt, @stage1Pass, @stage1Reason)
+      INSERT OR IGNORE INTO tokens (mint, symbol, name, creator, twitter, telegram, website, created_at, stage1_pass, stage1_reason, bonding_curve, creation_sig, dev_buy_tokens, image)
+      VALUES (@mint, @symbol, @name, @creator, @twitter, @telegram, @website, @createdAt, @stage1Pass, @stage1Reason, @bondingCurve, @creationSig, @devBuyTokens, @image)
     `).run({
       ...t,
       twitter: t.twitter ?? null, telegram: t.telegram ?? null, website: t.website ?? null,
       stage1Pass: t.stage1Pass ? 1 : 0, stage1Reason: t.stage1Reason ?? null,
+      bondingCurve: t.bondingCurve ?? null, creationSig: t.creationSig ?? null,
+      devBuyTokens: t.devBuyTokens ?? null, image: t.image ?? null,
     });
+  }
+
+  /** Graveyard candidates for the revival sweep: screened fine, watched, never alerted. */
+  revivalCandidates(sinceMs: number, limit: number): RevivalRow[] {
+    const rows = this.db.prepare(`
+      SELECT mint, symbol, name, creator, twitter, telegram, website, image,
+             bonding_curve AS bondingCurve, creation_sig AS creationSig,
+             dev_buy_tokens AS devBuyTokens, created_at AS createdAt
+      FROM tokens
+      WHERE stage1_pass = 1 AND outcome = 'expired' AND bonding_curve IS NOT NULL AND bonding_curve != '' AND created_at >= ?
+      ORDER BY created_at DESC LIMIT ?
+    `).all(sinceMs, limit) as Array<Record<string, unknown>>;
+    return rows.map((r) => ({
+      mint: r.mint as string, symbol: r.symbol as string, name: r.name as string, creator: r.creator as string,
+      twitter: (r.twitter as string | null) ?? undefined,
+      telegram: (r.telegram as string | null) ?? undefined,
+      website: (r.website as string | null) ?? undefined,
+      image: (r.image as string | null) ?? undefined,
+      bondingCurve: r.bondingCurve as string,
+      creationSig: (r.creationSig as string | null) ?? '',
+      devBuyTokens: (r.devBuyTokens as number | null) ?? 0,
+      createdAt: r.createdAt as number,
+    }));
   }
 
   setOutcome(mint: string, outcome: Outcome): void {
     this.db.prepare('UPDATE tokens SET outcome = ? WHERE mint = ?').run(outcome, mint);
+  }
+
+  /**
+   * Watchlist state is in-memory, so a restart strands mid-watch tokens at 'watching'/'triggered'
+   * forever — invisible to the revival graveyard. Called once at boot to return them to 'expired'.
+   */
+  reconcileInterrupted(olderThanMs: number): number {
+    const r = this.db.prepare(
+      "UPDATE tokens SET outcome = 'expired' WHERE outcome IN ('watching', 'triggered') AND created_at < ?",
+    ).run(olderThanMs);
+    return r.changes;
   }
 
   getOutcome(mint: string): Outcome | null {

@@ -50,6 +50,14 @@ export interface FollowUpConfig {
   liveEditSec: number; // live-edit the alert card every N seconds during the window; 0 = off
 }
 
+export interface RevivalConfig {
+  lookbackDays: number;
+  sweepMinutes: number;
+  jumpMult: number;
+  minMcUsd: number;
+  maxCandidates: number;
+}
+
 export interface BuyButton {
   label: string;
   url: string; // may contain {CA}, replaced with the token mint
@@ -68,6 +76,7 @@ export interface AppConfig {
   deep: DeepConfig;
   launch: LaunchConfig;
   followUp: FollowUpConfig;
+  revival: RevivalConfig;
   buttons: ButtonsConfig;
   alertScoreThreshold: number;
   solPriceFallbackUsd: number;
@@ -116,6 +125,11 @@ export function loadConfig(path = 'config.json'): AppConfig {
     ['followUp.windowMinutes', cfg.followUp?.windowMinutes],
     ['followUp.dumpAlertPct', cfg.followUp?.dumpAlertPct],
     ['followUp.liveEditSec', cfg.followUp?.liveEditSec],
+    ['revival.lookbackDays', cfg.revival?.lookbackDays],
+    ['revival.sweepMinutes', cfg.revival?.sweepMinutes],
+    ['revival.jumpMult', cfg.revival?.jumpMult],
+    ['revival.minMcUsd', cfg.revival?.minMcUsd],
+    ['revival.maxCandidates', cfg.revival?.maxCandidates],
     ['alertScoreThreshold', cfg.alertScoreThreshold],
     ['solPriceFallbackUsd', cfg.solPriceFallbackUsd],
     ['summaryHourLocal', cfg.summaryHourLocal],

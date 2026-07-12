@@ -43,6 +43,13 @@
     "milestones": [2, 5, 10, 25, 50, 100],
     "liveEditSec": 45
   },
+  "revival": {
+    "lookbackDays": 3,
+    "sweepMinutes": 10,
+    "jumpMult": 2,
+    "minMcUsd": 8000,
+    "maxCandidates": 6000
+  },
   "buttons": {
     "buy": [],
     "chart": true,

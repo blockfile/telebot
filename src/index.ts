@@ -14,6 +14,7 @@ import { fetchDevHistory } from './checks/devHistory';
 import { fetchTop10Pct, fetchHolderCount } from './checks/holders';
 import { analyzeLaunch } from './checks/launchAnalysis';
 import { FollowUps } from './pipeline/followups';
+import { RevivalWatcher } from './pipeline/revivals';
 import {
   Telegram, formatAlert, formatFollowUp, buildButtons,
   type AlertData, type FollowUpData, type Keyboard, type SendResult,
@@ -99,6 +100,34 @@ const followUps = new FollowUps(cfg.followUp, {
   },
 });
 
+// Graveyard sweep: expired stage1-passed tokens whose bonding-curve MC jumps off its floor
+// re-enter the normal watchlist and must pass all the usual gates to alert.
+const revivals = new RevivalWatcher(cfg.revival, {
+  candidates: () => db.revivalCandidates(Date.now() - cfg.revival.lookbackDays * 86_400_000, cfg.revival.maxCandidates),
+  fetchAccounts: async (keys) => {
+    const res = await rpc.call<{ value: Array<{ data?: [string, string] } | null> }>(
+      'getMultipleAccounts', [keys, { encoding: 'base64' }],
+    );
+    return (res.value ?? []).map((v) => v?.data?.[0] ?? null);
+  },
+  solUsd: () => solPrice.usd,
+  wake: (r, mcSol, vSolSol) => {
+    const event: NewTokenEvent = {
+      mint: r.mint, name: r.name, symbol: r.symbol, uri: '', creator: r.creator,
+      devBuyTokens: r.devBuyTokens, devBuySol: 0, bondingCurveKey: r.bondingCurve,
+      marketCapSol: mcSol, vSolInBondingCurve: vSolSol, signature: r.creationSig,
+      receivedAt: r.createdAt, // true creation time — alerts show real token age
+    };
+    // addedAt just past the bundle window: same-slot bundle detection is meaningless for a
+    // revival (launch was hours ago), and this keeps a hot re-entry from tripping it.
+    watchlist.add(event, { twitter: r.twitter, telegram: r.telegram, website: r.website, image: r.image },
+      Date.now() - cfg.watch.bundleWindowMs - 1);
+    db.setOutcome(r.mint, 'watching');
+    const ageH = ((Date.now() - r.createdAt) / 3_600_000).toFixed(1);
+    log('info', `revival: $${r.symbol} (${r.mint}) woke up at ~$${((mcSol * solPrice.usd) / 1000).toFixed(1)}k MC, age ${ageH}h — re-watching`);
+  },
+});
+
 async function handleNew(event: NewTokenEvent): Promise<void> {
   try {
     const meta = await fetchMeta(event.uri);
@@ -117,6 +146,9 @@ async function handleNew(event: NewTokenEvent): Promise<void> {
       mint: event.mint, symbol: event.symbol, name: event.name, creator: event.creator,
       twitter: m.twitter, telegram: m.telegram, website: m.website,
       createdAt: event.receivedAt, stage1Pass: result.pass, stage1Reason: result.reason,
+      bondingCurve: event.bondingCurveKey || undefined, // never store '' — it would poison a curve-poll batch
+      creationSig: event.signature || undefined,
+      devBuyTokens: event.devBuyTokens, image: m.image,
     });
     db.bumpDev(event.creator, 'launches', event.receivedAt);
     if (handle) db.recordHandle(handle, event.mint, event.receivedAt);
@@ -172,7 +204,8 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
       topMarketCapUsd: t.peakMarketCapSol * solPrice.usd,
       volumeUsd: t.volumeSol * solPrice.usd,
       liquidityUsd: t.lastVSolInCurve * solPrice.usd,
-      ageMinutes: Math.round((Date.now() - t.addedAt) / 60_000),
+      // true token age (from mint), not time-on-watchlist — matters for revived tokens
+      ageMinutes: Math.round((Date.now() - t.event.receivedAt) / 60_000),
       uniqueBuyers: t.buyers.size,
       holderCount: results.holderCount,
       feesSol: t.volumeSol * 0.01, // pump.fun takes ~1% of traded volume
@@ -293,6 +326,16 @@ setInterval(() => {
   followUps.sweep(now);
 }, 60_000);
 
+{
+  let sweeping = false; // a slow RPC sweep must not overlap the next one
+  const t = setInterval(() => {
+    if (sweeping) return;
+    sweeping = true;
+    void revivals.sweep().finally(() => { sweeping = false; });
+  }, cfg.revival.sweepMinutes * 60_000);
+  t.unref();
+}
+
 let lastSummaryDay = -1;
 setInterval(() => {
   void maybeSendSummary(db, (text) => send(text).then((r) => r.ok), cfg.summaryHourLocal, new Date(), lastSummaryDay)
@@ -312,6 +355,12 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason) => {
   log('error', `unhandled rejection: ${String(reason)}`);
 });
+
+{
+  // Tokens stranded mid-watch by the previous shutdown go back to the graveyard.
+  const reconciled = db.reconcileInterrupted(Date.now() - cfg.watch.windowMinutes * 60_000);
+  if (reconciled > 0) log('info', `reconciled ${reconciled} tokens stranded mid-watch by the last shutdown`);
+}
 
 if (!secrets.pumpportalApiKey) {
   log('warn', 'PUMPPORTAL_API_KEY is not set — PumpPortal rejects trade streams without a funded API key, so market cap/buyers/dev sells cannot be tracked and NO ALERTS will ever fire. See README "PumpPortal API key".');

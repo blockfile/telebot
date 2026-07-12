@@ -227,6 +227,22 @@ describe('analyzeLaunch', () => {
     expect(await analyzeLaunch(rpc, MINT, CURVE, DEV, 'create', 60)).toBe('unknown');
   });
 
+  it("dev outflow degrades to 'unknown' when the creator's signature window doesn't reach the launch", async () => {
+    // 1000 dev sigs, ALL newer than creation: the launch-era transfers are provably outside the window
+    const devSigs = Array.from({ length: 1000 }, (_, i) => ({ signature: `d${i}`, slot: 5000 + i }));
+    const rpc = fakeRpc({
+      createSlot: 100,
+      curveSigs: [{ signature: 'create', slot: 100 }, { signature: 'b1', slot: 100 }],
+      txBySig: { b1: buy('buyer1', 10_000_000) },
+      devSigs,
+    });
+    const r = await analyzeLaunch(rpc, MINT, CURVE, DEV, 'create', 60, 3, 15);
+    expect(r).not.toBe('unknown');
+    if (r === 'unknown') return;
+    expect(r.devOutflowPct).toBe('unknown'); // not a confidently wrong 0%
+    expect(r.bundlePct).toBeCloseTo(1, 5);   // rest of the analysis unaffected
+  });
+
   it("returns 'unknown' when the creation tx has no slot", async () => {
     const rpc = { call: async (m: string) => (m === 'getTransaction' ? null : []) } as unknown as Rpc;
     expect(await analyzeLaunch(rpc, MINT, CURVE, DEV, 'create', 60)).toBe('unknown');
