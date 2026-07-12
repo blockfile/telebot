@@ -33,6 +33,7 @@ export interface DeepConfig {
 
 export interface LaunchConfig {
   bundleHardRejectPct: number;
+  bundleHeldHardRejectPct: number;
   bundlePenaltyPct: number;
   bundlePenalty: number;
   devOutflowHardRejectPct: number;
@@ -114,6 +115,7 @@ export function loadConfig(path = 'config.json'): AppConfig {
     ['deep.xMissingPenalty', cfg.deep?.xMissingPenalty],
     ['deep.devHoldsBonus', cfg.deep?.devHoldsBonus],
     ['launch.bundleHardRejectPct', cfg.launch?.bundleHardRejectPct],
+    ['launch.bundleHeldHardRejectPct', cfg.launch?.bundleHeldHardRejectPct],
     ['launch.bundlePenaltyPct', cfg.launch?.bundlePenaltyPct],
     ['launch.bundlePenalty', cfg.launch?.bundlePenalty],
     ['launch.devOutflowHardRejectPct', cfg.launch?.devOutflowHardRejectPct],

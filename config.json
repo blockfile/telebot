@@ -28,6 +28,7 @@
   },
   "launch": {
     "bundleHardRejectPct": 50,
+    "bundleHeldHardRejectPct": 30,
     "bundlePenaltyPct": 20,
     "bundlePenalty": 15,
     "devOutflowHardRejectPct": 30,

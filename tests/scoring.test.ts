@@ -8,7 +8,7 @@ const CFG = {
 };
 
 const LAUNCH = {
-  bundleHardRejectPct: 50, bundlePenaltyPct: 20, bundlePenalty: 15,
+  bundleHardRejectPct: 50, bundleHeldHardRejectPct: 30, bundlePenaltyPct: 20, bundlePenalty: 15,
   devOutflowHardRejectPct: 30, devOutflowPenaltyPct: 10, devOutflowPenalty: 15,
   first20FlagPct: 60, maxEarlyTxFetch: 60, sniperSlots: 3,
 };
@@ -72,9 +72,25 @@ describe('scoreToken', () => {
     expect(r.score).toBe(0);
   });
 
-  it('hard rejects heavy bundle and heavy dev outflow', () => {
+  it('hard rejects heavy bundle (holdings unverifiable) and heavy dev outflow', () => {
+    // bundleHeldPct 'unknown' in the clean fixture -> conservative bought-at-launch rule
     expect(scoreToken(clean({ bundlePct: 62 }), CFG, LAUNCH).hardRejects).toEqual(['bundle 62%']);
     expect(scoreToken(clean({ devOutflowPct: 40 }), CFG, LAUNCH).hardRejects).toEqual(['dev moved out 40%']);
+  });
+
+  it('judges the bundle by what insiders STILL HOLD when holdings are known', () => {
+    // SCATMAN case: 82% bundled at launch but distributed to 7% -> no hard reject, just the penalty+flag
+    const distributed = scoreToken(clean({ bundlePct: 82, bundleHeldPct: 7 }), CFG, LAUNCH);
+    expect(distributed.hardRejects).toEqual([]);
+    expect(distributed.score).toBe(65); // 80 - bundlePenalty(15)
+    expect(distributed.flags).toContain('bundled 82% at launch');
+    // Loaded gun: bundlers still sitting on 35% -> hard reject regardless of bought size
+    const loaded = scoreToken(clean({ bundlePct: 40, bundleHeldPct: 35 }), CFG, LAUNCH);
+    expect(loaded.hardRejects).toEqual(['bundlers still hold 35%']);
+    // Small verified bundle fully held but under the held threshold -> no reject, no penalty (below penaltyPct)
+    const small = scoreToken(clean({ bundlePct: 10, bundleHeldPct: 10 }), CFG, LAUNCH);
+    expect(small.hardRejects).toEqual([]);
+    expect(small.score).toBe(80);
   });
 
   it('penalizes medium bundle / dev outflow and flags high first-20', () => {
