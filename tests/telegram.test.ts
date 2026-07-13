@@ -57,11 +57,9 @@ describe('formatAlert', () => {
     expect(text).toContain('🎯 First 20: 31%');
     expect(text).toContain('🛠 Dev: 2.1% | Out: 0% | Priors: 0');
     expect(text).toContain('🏆 Top 10: 21%');
-    expect(text).toContain('🐦 X ✅ | TG ✅ | Web ❌');
+    expect(text).toContain('🐦 <a href="https://x.com/dev">X ✅</a> | <a href="https://t.me/c">TG ✅</a> | Web ❌');
     expect(text).toContain('⚠️ top10 35%');
     expect(text).not.toContain('📈 Now:'); // no live line unless live data is passed
-    // links are now buttons, not inline text in the caption
-    expect(text).not.toContain('href=');
   });
 
   it('renders the live Now line and held-trend emojis', () => {
@@ -100,20 +98,22 @@ describe('formatAlert', () => {
     expect(text).toContain('Out: ?');
   });
 
-  it('omits GMGN lines entirely when gmgn is absent (flag off / disabled default)', () => {
+  it('omits the GMGN line entirely when gmgn is absent (flag off / disabled default)', () => {
     const text = formatAlert(DATA);
-    expect(text).not.toContain('Smart$');
+    expect(text).not.toContain('🧠 Smart');
     expect(text).not.toContain('GMGN:');
   });
 
-  it('renders the GMGN star rating + smart-money/KOL and security cross-check lines when present', () => {
+  it('renders the GMGN star rating + icon’d smart-money/KOL (and NO security/tax line)', () => {
     const text = formatAlert({
       ...DATA,
       gmgn: { smartMoneyCount: 3, kolCount: 4, honeypot: false, washTrading: false, buyTaxPct: 0, sellTaxPct: 5, top10Pct: 21 },
     });
     // smart money + KOL present, no negatives → 5★
-    expect(text).toContain('⭐ GMGN: ⭐⭐⭐⭐⭐ · Smart$ 3 · KOL 4');
-    expect(text).toContain('🛡 Security: ✅ · Tax 0%/5% · Top10 21%');
+    expect(text).toContain('⭐ GMGN: ⭐⭐⭐⭐⭐ · 🧠 Smart: 3 · 👑 KOL: 4');
+    // the noisy security/tax line is gone
+    expect(text).not.toContain('🛡 Security');
+    expect(text).not.toContain('Tax ');
   });
 
   it('renders a partial star bar with empty stars (☆)', () => {
@@ -122,27 +122,28 @@ describe('formatAlert', () => {
       gmgn: { smartMoneyCount: 2, kolCount: 0, honeypot: false, washTrading: false, buyTaxPct: 0, sellTaxPct: 0, top10Pct: 21 },
     });
     // smart money present only → 4★ → ⭐⭐⭐⭐☆
-    expect(text).toContain('⭐ GMGN: ⭐⭐⭐⭐☆ · Smart$ 2 · KOL 0');
+    expect(text).toContain('⭐ GMGN: ⭐⭐⭐⭐☆ · 🧠 Smart: 2 · 👑 KOL: 0');
   });
 
-  it('flags a honeypot with a warning instead of the checkmark, and tags wash trading', () => {
+  it('appends an inline HONEYPOT / WASH warning to the GMGN line (no separate security line)', () => {
     const text = formatAlert({
       ...DATA,
       gmgn: { smartMoneyCount: 0, kolCount: 0, honeypot: true, washTrading: true, buyTaxPct: 99, sellTaxPct: 99, top10Pct: 90 },
     });
-    // honeypot + wash + high tax, no positives → 1★ (clamped)
-    expect(text).toContain('⭐ GMGN: ⭐☆☆☆☆ · Smart$ 0 · KOL 0');
-    expect(text).toContain('🛡 Security: ⚠️ HONEYPOT · Tax 99%/99% · Top10 90% · 🧼 WASH');
+    // honeypot + wash + high tax, no positives → 1★ (clamped), warnings appended inline
+    expect(text).toContain('⭐ GMGN: ⭐☆☆☆☆ · 🧠 Smart: 0 · 👑 KOL: 0 · ⚠️ HONEYPOT · 🧼 WASH');
+    expect(text).not.toContain('🛡 Security');
   });
 
-  it('renders GMGN unknown sub-fields as ? without dropping the lines (neutral 3★)', () => {
+  it('renders GMGN unknown counts as ? without dropping the line or warning (neutral 3★)', () => {
     const text = formatAlert({
       ...DATA,
       gmgn: { smartMoneyCount: 'unknown', kolCount: 'unknown', honeypot: 'unknown', washTrading: 'unknown', buyTaxPct: 'unknown', sellTaxPct: 'unknown', top10Pct: 'unknown' },
     });
-    // all-unknown is neutral → 3★
-    expect(text).toContain('⭐ GMGN: ⭐⭐⭐☆☆ · Smart$ ? · KOL ?');
-    expect(text).toContain('🛡 Security: ? · Tax ? · Top10 ?');
+    // all-unknown is neutral → 3★, no honeypot/wash warning (only fires on confirmed true)
+    expect(text).toContain('⭐ GMGN: ⭐⭐⭐☆☆ · 🧠 Smart: ? · 👑 KOL: ?');
+    expect(text).not.toContain('HONEYPOT');
+    expect(text).not.toContain('🛡 Security');
   });
 });
 

@@ -87,7 +87,9 @@ function heldArrow(boughtPct: number | 'unknown', heldPct: number | 'unknown'): 
 
 export function formatAlert(d: AlertData): string {
   const usd = (v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v.toFixed(0)}`);
-  const mark = (v: string | undefined) => (v ? '✅' : '❌');
+  // Clickable social: when the token has the URL, the label links to it; otherwise ❌.
+  const socialLink = (label: string, url: string | undefined) =>
+    url ? `<a href="${escapeHtml(url)}">${label} ✅</a>` : `${label} ❌`;
   const top10 = d.top10Pct === 'unknown' ? '?' : `${d.top10Pct.toFixed(0)}%`;
   const priors = d.priorLaunches === 'unknown' ? '?' : String(d.priorLaunches);
   const holders = d.holderCount === 'unknown' ? '?' : String(d.holderCount);
@@ -103,15 +105,16 @@ export function formatAlert(d: AlertData): string {
     const starStr = '⭐'.repeat(stars) + '☆'.repeat(5 - stars);
     const smart = g.smartMoneyCount === 'unknown' ? '?' : String(g.smartMoneyCount);
     const kol = g.kolCount === 'unknown' ? '?' : String(g.kolCount);
-    const hp = g.honeypot === 'unknown' ? '?' : g.honeypot ? '⚠️ HONEYPOT' : '✅';
-    const tax = g.buyTaxPct === 'unknown' || g.sellTaxPct === 'unknown'
-      ? '?' : `${g.buyTaxPct.toFixed(0)}%/${g.sellTaxPct.toFixed(0)}%`;
-    const gTop10 = g.top10Pct === 'unknown' ? '?' : `${g.top10Pct.toFixed(0)}%`;
-    const washTag = g.washTrading === true ? ' · 🧼 WASH' : '';
+    // Solana pump.fun tokens have no buy/sell tax and GMGN's security/tax often reads '?', so that
+    // line was pure noise — dropped. Keep the ⭐ quality rating + smart-money/KOL with icons, and
+    // surface an inline warning ONLY when GMGN actually confirms a honeypot / wash-trading.
+    const warns: string[] = [];
+    if (g.honeypot === true) warns.push('⚠️ HONEYPOT');
+    if (g.washTrading === true) warns.push('🧼 WASH');
+    const warnTag = warns.length ? ` · ${warns.join(' · ')}` : '';
     gmgnLines = [
       '',
-      `⭐ GMGN: ${starStr} · Smart$ ${smart} · KOL ${kol}`,
-      `🛡 Security: ${hp} · Tax ${tax} · Top10 ${gTop10}${washTag}`,
+      `⭐ GMGN: ${starStr} · 🧠 Smart: ${smart} · 👑 KOL: ${kol}${warnTag}`,
     ];
   }
 
@@ -134,7 +137,7 @@ export function formatAlert(d: AlertData): string {
     `🛠 Dev: ${d.devBuyPct.toFixed(1)}% | Out: ${pctOrQ(d.devOutflowPct)} | Priors: ${priors}`,
     `🏆 Top 10: ${top10}`,
     '',
-    `🐦 X ${mark(d.twitter)} | TG ${mark(d.telegram)} | Web ${mark(d.website)}`,
+    `🐦 ${socialLink('X', d.twitter)} | ${socialLink('TG', d.telegram)} | ${socialLink('Web', d.website)}`,
     ...gmgnLines,
     '',
     `<code>${d.mint}</code>`, // tap to copy — links are the buttons below
