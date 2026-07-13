@@ -87,9 +87,15 @@ function heldArrow(boughtPct: number | 'unknown', heldPct: number | 'unknown'): 
 
 export function formatAlert(d: AlertData): string {
   const usd = (v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v.toFixed(0)}`);
-  // Clickable social: when the token has the URL, the label links to it; otherwise ❌.
-  const socialLink = (label: string, url: string | undefined) =>
-    url ? `<a href="${escapeHtml(url)}">${label} ✅</a>` : `${label} ❌`;
+  // Clickable social: link the label to the token's page. pump.fun metadata usually stores a full
+  // URL, but tolerate a bare handle (e.g. "@dev" / "dev") by building the platform URL from it.
+  const socialUrl = (label: 'X' | 'TG' | 'Web', v: string): string => {
+    if (/^https?:\/\//i.test(v)) return v;
+    const h = v.replace(/^@/, '').replace(/^\/+/, '');
+    return label === 'X' ? `https://x.com/${h}` : label === 'TG' ? `https://t.me/${h}` : `https://${h}`;
+  };
+  const socialLink = (label: 'X' | 'TG' | 'Web', url: string | undefined) =>
+    url ? `<a href="${escapeHtml(socialUrl(label, url))}">${label} ✅</a>` : `${label} ❌`;
   const top10 = d.top10Pct === 'unknown' ? '?' : `${d.top10Pct.toFixed(0)}%`;
   const priors = d.priorLaunches === 'unknown' ? '?' : String(d.priorLaunches);
   const holders = d.holderCount === 'unknown' ? '?' : String(d.holderCount);

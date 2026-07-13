@@ -62,6 +62,16 @@ describe('formatAlert', () => {
     expect(text).not.toContain('📈 Now:'); // no live line unless live data is passed
   });
 
+  it('links full-URL socials as-is and normalizes bare handles into clickable links', () => {
+    // full URLs (the pump.fun norm) pass through
+    expect(formatAlert(DATA)).toContain('🐦 <a href="https://x.com/dev">X ✅</a> | <a href="https://t.me/c">TG ✅</a> | Web ❌');
+    // bare handles get built into platform URLs
+    const handles = formatAlert({ ...DATA, twitter: '@coolproj', telegram: 'coolportal', website: 'coolproj.io' });
+    expect(handles).toContain('<a href="https://x.com/coolproj">X ✅</a>');
+    expect(handles).toContain('<a href="https://t.me/coolportal">TG ✅</a>');
+    expect(handles).toContain('<a href="https://coolproj.io">Web ✅</a>');
+  });
+
   it('renders the live Now line and held-trend emojis', () => {
     const live = formatAlert({ ...DATA, live: { nowUsd: 48200, multiple: 3.1 } });
     expect(live).toContain('📈 Now: $48.2k • 3.1X');
