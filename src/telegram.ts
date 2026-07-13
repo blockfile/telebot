@@ -153,45 +153,40 @@ export class Telegram {
   ) {}
 
   /**
-   * Send a message. A plain string sends text; a payload with `photoUrl` sends an
-   * image card (caption + buttons) and, if Telegram can't fetch the image, falls
-   * back to a text message so an alert is never lost to a bad image URL.
-   * Returns the delivered message's id so the caller can live-edit it later.
+   * Send an alert as a TEXT message so the <code> contract address is reliably tap-to-copy on
+   * mobile (tap-to-copy is flaky inside photo captions). When `photoUrl` is given, the token
+   * image rides along as a LARGE link preview shown ABOVE the text — the best of both worlds.
+   * A dead/unfetchable image just yields no preview (Telegram drops it silently), so an alert is
+   * never lost to a bad image URL. Returns the delivered message's id for later live-edits.
    */
   async send(payload: string | { text: string; photoUrl?: string; buttons?: Keyboard }): Promise<SendResult> {
     const p = typeof payload === 'string' ? { text: payload } : payload;
     const markup = p.buttons?.length ? { reply_markup: { inline_keyboard: p.buttons } } : {};
-
-    if (p.photoUrl) {
-      const sent = await this.post('sendPhoto', {
-        chat_id: this.chatId, photo: p.photoUrl, caption: p.text, parse_mode: 'HTML', ...markup,
-      });
-      if (sent.ok) return { ok: true, messageId: sent.messageId, photo: true };
-      // image couldn't be fetched/sent (e.g. dead IPFS gateway) — fall through to a plain text message
-      log('warn', `sendPhoto failed for ${p.photoUrl} — falling back to text`);
-    }
+    const linkPreview = p.photoUrl
+      ? { url: p.photoUrl, prefer_large_media: true, show_above_text: true }
+      : { is_disabled: false };
 
     const sent = await this.post('sendMessage', {
       chat_id: this.chatId, text: p.text, parse_mode: 'HTML',
-      link_preview_options: { is_disabled: false }, ...markup,
+      link_preview_options: linkPreview, ...markup,
     });
     return { ok: sent.ok, messageId: sent.messageId, photo: false };
   }
 
   /**
-   * Live-edit a previously sent card. `photo` selects editMessageCaption vs editMessageText.
-   * MUST resend the buttons — an edit without reply_markup clears the inline keyboard.
-   * Single attempt (called on a timer; the next tick is the retry). Never throws.
+   * Live-edit a previously sent card via editMessageText, preserving the large image preview
+   * (pass the same `photoUrl`). MUST resend the buttons — an edit without reply_markup clears
+   * the inline keyboard. Single attempt (called on a timer; the next tick is the retry). Never throws.
    */
-  async editCaption(messageId: number, text: string, buttons: Keyboard, photo: boolean): Promise<boolean> {
+  async editCaption(messageId: number, text: string, buttons: Keyboard, photoUrl?: string): Promise<boolean> {
     const markup = buttons.length ? { reply_markup: { inline_keyboard: buttons } } : {};
-    const body = photo
-      ? { chat_id: this.chatId, message_id: messageId, caption: text, parse_mode: 'HTML', ...markup }
-      : {
-          chat_id: this.chatId, message_id: messageId, text, parse_mode: 'HTML',
-          link_preview_options: { is_disabled: false }, ...markup,
-        };
-    const r = await this.post(photo ? 'editMessageCaption' : 'editMessageText', body, 1);
+    const linkPreview = photoUrl
+      ? { url: photoUrl, prefer_large_media: true, show_above_text: true }
+      : { is_disabled: false };
+    const r = await this.post('editMessageText', {
+      chat_id: this.chatId, message_id: messageId, text, parse_mode: 'HTML',
+      link_preview_options: linkPreview, ...markup,
+    }, 1);
     return r.ok;
   }
 

@@ -209,7 +209,7 @@ describe('Telegram', () => {
     expect(calls).toBe(3);
   });
 
-  it('sends a photo card with caption and inline buttons', async () => {
+  it('sends an alert as a text message with a large image preview above (not a photo caption)', async () => {
     const captured: Array<{ url: string; body: any }> = [];
     const f = (async (url: RequestInfo | URL, init?: RequestInit) => {
       captured.push({ url: String(url), body: JSON.parse(String(init?.body)) });
@@ -217,30 +217,28 @@ describe('Telegram', () => {
     }) as unknown as typeof fetch;
     const buttons = [[{ text: 'Chart', url: 'https://c' }]];
     const r = await new Telegram('T', '42', f).send({ text: 'cap', photoUrl: 'https://img', buttons });
-    expect(r).toMatchObject({ ok: true, messageId: 777, photo: true });
+    // delivered as TEXT (photo:false) so the <code> CA is tap-to-copy on mobile
+    expect(r).toMatchObject({ ok: true, messageId: 777, photo: false });
     expect(captured).toHaveLength(1);
-    expect(captured[0].url).toBe('https://api.telegram.org/botT/sendPhoto');
+    expect(captured[0].url).toBe('https://api.telegram.org/botT/sendMessage');
     expect(captured[0].body).toMatchObject({
-      chat_id: '42', photo: 'https://img', caption: 'cap', parse_mode: 'HTML',
+      chat_id: '42', text: 'cap', parse_mode: 'HTML',
+      link_preview_options: { url: 'https://img', prefer_large_media: true, show_above_text: true },
       reply_markup: { inline_keyboard: buttons },
     });
   });
 
-  it('falls back to a text message when the photo cannot be sent', async () => {
-    const urls: string[] = [];
-    const f = (async (url: RequestInfo | URL) => {
-      const u = String(url);
-      urls.push(u);
-      // sendPhoto always fails (e.g. Telegram can't fetch the IPFS image); sendMessage succeeds
-      return u.endsWith('/sendPhoto')
-        ? new Response('{"ok":false,"description":"wrong file"}', { status: 400 })
-        : new Response('{"ok":true}', { status: 200 });
+  it('sends plain text with the preview disabled when there is no image', async () => {
+    const captured: Array<{ url: string; body: any }> = [];
+    const f = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      captured.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+      return new Response('{"ok":true,"result":{"message_id":1}}', { status: 200 });
     }) as unknown as typeof fetch;
-    const r = await new Telegram('T', '1', f).send({ text: 'cap', photoUrl: 'https://bad' });
-    expect(r.ok).toBe(true);
-    expect(r.photo).toBe(false); // delivered as text, so live edits must use editMessageText
-    expect(urls.some((u) => u.endsWith('/sendPhoto'))).toBe(true);
-    expect(urls.some((u) => u.endsWith('/sendMessage'))).toBe(true);
+    const r = await new Telegram('T', '1', f).send({ text: 'cap' });
+    expect(r.photo).toBe(false);
+    expect(captured[0].url).toBe('https://api.telegram.org/botT/sendMessage');
+    expect(captured[0].body.link_preview_options).toMatchObject({ is_disabled: false });
+    expect(captured[0].body.link_preview_options.url).toBeUndefined();
   });
 
   it('waits out a 429 using retry_after then succeeds', async () => {
@@ -259,27 +257,29 @@ describe('Telegram', () => {
     expect(Date.now() - start).toBeGreaterThanOrEqual(900); // waited (0 + 1)s
   }, 10_000);
 
-  it('editCaption edits a photo card via editMessageCaption and resends the buttons', async () => {
+  it('editCaption edits via editMessageText, keeps the large image preview, and resends buttons', async () => {
     const captured: Array<{ url: string; body: any }> = [];
     const f = (async (url: RequestInfo | URL, init?: RequestInit) => {
       captured.push({ url: String(url), body: JSON.parse(String(init?.body)) });
       return new Response('{"ok":true}', { status: 200 });
     }) as unknown as typeof fetch;
     const buttons = [[{ text: 'Chart', url: 'https://c' }]];
-    const ok = await new Telegram('T', '42', f).editCaption(777, 'updated', buttons, true);
+    const ok = await new Telegram('T', '42', f).editCaption(777, 'updated', buttons, 'https://img');
     expect(ok).toBe(true);
-    expect(captured[0].url).toBe('https://api.telegram.org/botT/editMessageCaption');
+    expect(captured[0].url).toBe('https://api.telegram.org/botT/editMessageText');
     expect(captured[0].body).toMatchObject({
-      chat_id: '42', message_id: 777, caption: 'updated', parse_mode: 'HTML',
+      chat_id: '42', message_id: 777, text: 'updated', parse_mode: 'HTML',
+      link_preview_options: { url: 'https://img', prefer_large_media: true, show_above_text: true },
       reply_markup: { inline_keyboard: buttons }, // an edit without reply_markup drops the buttons
     });
   });
 
-  it('editCaption edits a text card via editMessageText', async () => {
-    let url = '';
-    const f = (async (u: RequestInfo | URL) => { url = String(u); return new Response('{"ok":true}', { status: 200 }); }) as unknown as typeof fetch;
-    expect(await new Telegram('T', '1', f).editCaption(5, 'x', [], false)).toBe(true);
+  it('editCaption without an image still uses editMessageText (preview disabled)', async () => {
+    let url = ''; let body: any;
+    const f = (async (u: RequestInfo | URL, init?: RequestInit) => { url = String(u); body = JSON.parse(String(init?.body)); return new Response('{"ok":true}', { status: 200 }); }) as unknown as typeof fetch;
+    expect(await new Telegram('T', '1', f).editCaption(5, 'x', [])).toBe(true);
     expect(url).toBe('https://api.telegram.org/botT/editMessageText');
+    expect(body.link_preview_options).toMatchObject({ is_disabled: false });
   });
 
   it("editCaption treats 'message is not modified' as success and does not retry", async () => {
@@ -288,7 +288,7 @@ describe('Telegram', () => {
       calls++;
       return new Response('{"ok":false,"description":"Bad Request: message is not modified"}', { status: 400 });
     }) as unknown as typeof fetch;
-    expect(await new Telegram('T', '1', f).editCaption(5, 'same', [], true)).toBe(true);
+    expect(await new Telegram('T', '1', f).editCaption(5, 'same', [], 'https://img')).toBe(true);
     expect(calls).toBe(1);
   });
 });

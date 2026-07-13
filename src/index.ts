@@ -247,7 +247,7 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
       );
       if (sent.messageId !== undefined && cfg.followUp.liveEditSec > 0) {
         liveCards.set(t.event.mint, {
-          messageId: sent.messageId, photo: sent.photo === true,
+          messageId: sent.messageId, photoUrl,
           data: alertData, buttons, alertMcSol: t.lastMarketCapSol, startedAt: Date.now(), failCount: 0,
         });
       }
@@ -265,7 +265,7 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
 // --- follow-up tracker still has fresh trade data for the token.
 interface LiveCard {
   messageId: number;
-  photo: boolean;
+  photoUrl?: string;
   data: AlertData;
   buttons: Keyboard;
   alertMcSol: number;
@@ -282,13 +282,13 @@ async function tickLiveCards(): Promise<void> {
       // Tracking ended (dump/window). Freeze the card honestly: one final edit that drops the
       // stale "Now" line, so a dumped token doesn't keep displaying its peak forever.
       liveCards.delete(mint);
-      void telegram.editCaption(card.messageId, formatAlert(card.data), card.buttons, card.photo);
+      void telegram.editCaption(card.messageId, formatAlert(card.data), card.buttons, card.photoUrl);
       continue;
     }
     const nowUsd = fu.lastMcSol * solPrice.usd;
     const multiple = card.alertMcSol > 0 ? fu.lastMcSol / card.alertMcSol : 0;
     const caption = formatAlert({ ...card.data, live: { nowUsd, multiple } });
-    const ok = await telegram.editCaption(card.messageId, caption, card.buttons, card.photo);
+    const ok = await telegram.editCaption(card.messageId, caption, card.buttons, card.photoUrl);
     if (ok) {
       card.failCount = 0;
     } else if (++card.failCount >= 3) {
