@@ -57,6 +57,9 @@
     "scan": true,
     "pumpfun": true
   },
+  "gmgn": {
+    "enabled": false
+  },
   "alertScoreThreshold": 60,
   "solPriceFallbackUsd": 150,
   "summaryHourLocal": 9

@@ -71,6 +71,12 @@ export interface ButtonsConfig {
   pumpfun: boolean;
 }
 
+/** GMGN enrichment (security + smart-money/KOL signals on the alert card). Off by default —
+ * enabling it requires both this flag AND a GMGN_API_KEY in .env (see README). */
+export interface GmgnConfig {
+  enabled: boolean;
+}
+
 export interface AppConfig {
   stage1: Stage1Config;
   watch: WatchConfig;
@@ -79,6 +85,7 @@ export interface AppConfig {
   followUp: FollowUpConfig;
   revival: RevivalConfig;
   buttons: ButtonsConfig;
+  gmgn: GmgnConfig;
   alertScoreThreshold: number;
   solPriceFallbackUsd: number;
   summaryHourLocal: number;
@@ -89,6 +96,7 @@ export interface Secrets {
   telegramBotToken: string;
   telegramChatId: string;
   pumpportalApiKey: string;
+  gmgnApiKey: string;
 }
 
 export function loadConfig(path = 'config.json'): AppConfig {
@@ -152,6 +160,9 @@ export function loadConfig(path = 'config.json'): AppConfig {
       || typeof cfg.buttons.pumpfun !== 'boolean') {
     throw new Error('config.json missing buttons config (buy[], chart, scan, pumpfun)');
   }
+  if (typeof cfg.gmgn?.enabled !== 'boolean') {
+    throw new Error('config.json missing boolean field: gmgn.enabled');
+  }
   return cfg;
 }
 
@@ -167,6 +178,7 @@ export function loadSecrets(env: Record<string, string | undefined> = process.en
     telegramBotToken: get('TELEGRAM_BOT_TOKEN'),
     telegramChatId: get('TELEGRAM_CHAT_ID'),
     pumpportalApiKey: env['PUMPPORTAL_API_KEY'] ?? '', // optional: unlocks real-time trade streams
+    gmgnApiKey: env['GMGN_API_KEY'] ?? '', // optional: only used when config.json gmgn.enabled is true
   };
   if (missing.length) {
     throw new Error(`Missing required values in .env: ${missing.join(', ')}. Copy .env.example to .env and fill it in.`);

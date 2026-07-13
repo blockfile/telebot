@@ -13,6 +13,7 @@ import { checkUrlAlive, checkXExists } from './checks/liveness';
 import { fetchDevHistory } from './checks/devHistory';
 import { fetchTop10Pct, fetchHolderCount } from './checks/holders';
 import { analyzeLaunch } from './checks/launchAnalysis';
+import { GmgnClient } from './checks/gmgn';
 import { FollowUps } from './pipeline/followups';
 import { RevivalWatcher } from './pipeline/revivals';
 import {
@@ -32,6 +33,13 @@ const rpc = new Rpc(secrets.quicknodeRpcUrl);
 const telegram = new Telegram(secrets.telegramBotToken, secrets.telegramChatId);
 const solPrice = new SolPrice(cfg.solPriceFallbackUsd);
 const stream = new PumpPortalStream(secrets.pumpportalApiKey);
+// Off by default (config.json gmgn.enabled). When off, gmgnClient stays null and the deep-check
+// dep below resolves to 'unknown' with zero network calls — the pipeline behaves exactly as
+// before this feature existed.
+const gmgnClient = cfg.gmgn.enabled ? new GmgnClient(secrets.gmgnApiKey) : null;
+if (cfg.gmgn.enabled && !secrets.gmgnApiKey) {
+  log('warn', 'gmgn.enabled is true but GMGN_API_KEY is not set in .env — GMGN enrichment will fail every call and degrade to unknown on every card.');
+}
 
 async function send(payload: string | { text: string; photoUrl?: string; buttons?: Keyboard }): Promise<SendResult> {
   const p = typeof payload === 'string' ? { text: payload } : payload;
@@ -182,6 +190,7 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
       analyzeLaunch: (mint, bondingCurveKey, creator, creationSignature) =>
         analyzeLaunch(rpc, mint, bondingCurveKey, creator, creationSignature, cfg.launch.maxEarlyTxFetch, cfg.launch.sniperSlots),
       fetchHolderCount: (mint, curve) => fetchHolderCount(rpc, mint, curve),
+      fetchGmgn: (mint) => (gmgnClient ? gmgnClient.enrich(mint) : Promise.resolve('unknown')),
     });
     log('info', `deep checks for $${t.event.symbol} took ${Date.now() - deepStart}ms`);
 
@@ -222,6 +231,7 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
       first20Pct: results.first20Pct,
       devOutflowPct: results.devOutflowPct,
       twitter: t.meta.twitter, telegram: t.meta.telegram, website: t.meta.website,
+      gmgn: results.gmgn === 'unknown' ? undefined : results.gmgn,
     };
     const caption = formatAlert(alertData);
     const photoUrl = t.meta.image ? ipfsToHttp(t.meta.image) : undefined;

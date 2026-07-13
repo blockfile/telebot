@@ -3,6 +3,7 @@ import type { CheckResults, Unknown } from './scoring';
 import type { DevHistory } from '../checks/devHistory';
 import type { Liveness } from '../checks/liveness';
 import type { LaunchAnalysis } from '../checks/launchAnalysis';
+import type { GmgnEnrichment } from '../checks/gmgn';
 import { normalizeTwitterHandle, normalizeUrl } from '../checks/socials';
 
 export interface DeepCheckDeps {
@@ -13,6 +14,9 @@ export interface DeepCheckDeps {
   checkXExists(handle: string): Promise<Liveness>;
   analyzeLaunch(mint: string, bondingCurveKey: string, creator: string, creationSignature: string): Promise<LaunchAnalysis | 'unknown'>;
   fetchHolderCount(mint: string, bondingCurveKey: string): Promise<number | 'unknown'>;
+  /** Best-effort GMGN enrichment. Bind to `async () => 'unknown'` (no I/O) when gmgn.enabled is
+   * false — that's what keeps the feature a true no-op while off (see checks/gmgn.ts). */
+  fetchGmgn(mint: string): Promise<Unknown<GmgnEnrichment>>;
 }
 
 const UNKNOWN = Promise.resolve('unknown' as const);
@@ -20,7 +24,7 @@ const UNKNOWN = Promise.resolve('unknown' as const);
 export async function runDeepChecks(t: WatchedToken, deps: DeepCheckDeps): Promise<CheckResults> {
   const handle = t.meta.twitter ? normalizeTwitterHandle(t.meta.twitter) : null;
 
-  const [devHistory, top10Pct, twitterAlive, telegramAlive, websiteAlive, xExists, launch, holderCount] = await Promise.all([
+  const [devHistory, top10Pct, twitterAlive, telegramAlive, websiteAlive, xExists, launch, holderCount, gmgn] = await Promise.all([
     deps.fetchDevHistory(t.event.creator, t.event.mint),
     deps.fetchTop10Pct(t.event.mint, t.event.bondingCurveKey),
     t.meta.twitter ? deps.checkUrlAlive(normalizeUrl(t.meta.twitter)) : UNKNOWN,
@@ -29,6 +33,7 @@ export async function runDeepChecks(t: WatchedToken, deps: DeepCheckDeps): Promi
     handle ? deps.checkXExists(handle) : UNKNOWN,
     deps.analyzeLaunch(t.event.mint, t.event.bondingCurveKey, t.event.creator, t.event.signature),
     deps.fetchHolderCount(t.event.mint, t.event.bondingCurveKey),
+    deps.fetchGmgn(t.event.mint),
   ]);
 
   let funderLinkedToRug: Unknown<boolean> = 'unknown';
@@ -56,5 +61,6 @@ export async function runDeepChecks(t: WatchedToken, deps: DeepCheckDeps): Promi
     bundleCount: launch === 'unknown' ? 'unknown' : launch.bundleCount,
     bundleHeldPct: launch === 'unknown' ? 'unknown' : launch.bundleHeldPct,
     holderCount,
+    gmgn,
   };
 }

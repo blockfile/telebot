@@ -1,4 +1,5 @@
 import type { ButtonsConfig } from './config';
+import type { GmgnEnrichment } from './checks/gmgn';
 import { log } from './logger';
 
 export function escapeHtml(s: string): string {
@@ -67,6 +68,10 @@ export interface AlertData {
   website?: string;
   /** When present, a self-updating "Now" line is rendered (live-edited cards). */
   live?: { nowUsd: number; multiple: number };
+  /** GMGN enrichment (smart-money/KOL + security cross-check). Present only when config.json
+   * gmgn.enabled is true AND the fetch returned at least partial data — undefined otherwise,
+   * in which case the card renders exactly as it did before this feature existed. */
+  gmgn?: GmgnEnrichment;
 }
 
 /** bought -> held row, with a trend emoji: 💚 holding (>=70%), 🟡 trimming, 🔻 dumped (<30%). */
@@ -91,6 +96,22 @@ export function formatAlert(d: AlertData): string {
   const bundleLead = d.bundleCount === 'unknown' ? '?' : `${d.bundleCount} • ${heldArrow(d.bundlePct, d.bundleHeldPct)}`;
   const grade = d.score >= 80 ? '🔥' : d.score >= 70 ? '⚡' : '✅';
 
+  let gmgnLines: string[] = [];
+  if (d.gmgn) {
+    const g = d.gmgn;
+    const smart = g.smartMoneyCount === 'unknown' ? '?' : String(g.smartMoneyCount);
+    const kol = g.kolCount === 'unknown' ? '?' : String(g.kolCount);
+    const hp = g.honeypot === 'unknown' ? '?' : g.honeypot ? '⚠️ HONEYPOT' : '✅';
+    const tax = g.buyTaxPct === 'unknown' || g.sellTaxPct === 'unknown'
+      ? '?' : `${g.buyTaxPct.toFixed(0)}%/${g.sellTaxPct.toFixed(0)}%`;
+    const gTop10 = g.top10Pct === 'unknown' ? '?' : `${g.top10Pct.toFixed(0)}%`;
+    gmgnLines = [
+      '',
+      `🧠 Smart$: ${smart} · 👑 KOL: ${kol}`,
+      `🛡 GMGN: ${hp} · Tax ${tax} · Top10 ${gTop10}`,
+    ];
+  }
+
   const lines = [
     `${grade} <b>$${escapeHtml(d.symbol)}</b> • ${escapeHtml(d.name)}`,
     `⭐ Score: ${d.score}/100 | ⏱ ${d.ageMinutes}m`,
@@ -111,6 +132,7 @@ export function formatAlert(d: AlertData): string {
     `🏆 Top 10: ${top10}`,
     '',
     `🐦 X ${mark(d.twitter)} | TG ${mark(d.telegram)} | Web ${mark(d.website)}`,
+    ...gmgnLines,
     '',
     `<code>${d.mint}</code>`, // tap to copy — links are the buttons below
   );

@@ -23,6 +23,7 @@ const deps = (over: Partial<DeepCheckDeps> = {}): DeepCheckDeps => ({
     first20Pct: 31, devOutflowPct: 0,
   }),
   fetchHolderCount: async () => 341,
+  fetchGmgn: async () => 'unknown',
   ...over,
 });
 
@@ -37,7 +38,23 @@ describe('runDeepChecks', () => {
       bundlePct: 8, first20Pct: 31, devOutflowPct: 0,
       sniperCount: 4, sniperPct: 12, sniperHeldPct: 4,
       bundleCount: 3, bundleHeldPct: 3, holderCount: 341,
+      gmgn: 'unknown',
     });
+  });
+
+  it('passes the mint through to fetchGmgn and threads its result into the results', async () => {
+    let calledWith = '';
+    const r = await runDeepChecks(
+      watched({ twitter: 'https://x.com/d' }),
+      deps({
+        fetchGmgn: async (mint) => {
+          calledWith = mint;
+          return { smartMoneyCount: 3, kolCount: 4, honeypot: false, buyTaxPct: 0, sellTaxPct: 0, top10Pct: 21 };
+        },
+      }),
+    );
+    expect(calledWith).toBe('mintA');
+    expect(r.gmgn).toEqual({ smartMoneyCount: 3, kolCount: 4, honeypot: false, buyTaxPct: 0, sellTaxPct: 0, top10Pct: 21 });
   });
 
   it("marks absent links 'unknown' and skips their checks", async () => {

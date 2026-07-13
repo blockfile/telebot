@@ -21,6 +21,7 @@ const clean = (over: Partial<CheckResults> = {}): CheckResults => ({
   bundlePct: 5, first20Pct: 20, devOutflowPct: 0,
   sniperCount: 'unknown', sniperPct: 'unknown', sniperHeldPct: 'unknown',
   bundleCount: 'unknown', bundleHeldPct: 'unknown', holderCount: 'unknown',
+  gmgn: 'unknown',
   ...over,
 });
 
@@ -107,5 +108,14 @@ describe('scoreToken', () => {
     const r = scoreToken(clean({ bundlePct: 'unknown', first20Pct: 'unknown', devOutflowPct: 'unknown' }), CFG, LAUNCH);
     expect(r.score).toBe(80);
     expect(r.hardRejects).toEqual([]);
+  });
+
+  it('gmgn is display-only: present or absent, it never changes score, flags, or hard rejects', () => {
+    const withGmgn = scoreToken(clean({
+      gmgn: {
+        smartMoneyCount: 3, kolCount: 4, honeypot: true, buyTaxPct: 99, sellTaxPct: 99, top10Pct: 90,
+      },
+    }), CFG, LAUNCH);
+    expect(withGmgn).toEqual(scoreToken(clean(), CFG, LAUNCH));
   });
 });

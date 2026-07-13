@@ -1,4 +1,5 @@
 import type { DeepConfig, LaunchConfig } from '../config';
+import type { GmgnEnrichment } from '../checks/gmgn';
 
 export type Unknown<T> = T | 'unknown';
 
@@ -21,6 +22,8 @@ export interface CheckResults {
   bundleCount: Unknown<number>;
   bundleHeldPct: Unknown<number>;
   holderCount: Unknown<number>;
+  // display-only, best-effort, off unless config.json gmgn.enabled is true (see checks/gmgn.ts)
+  gmgn: Unknown<GmgnEnrichment>;
 }
 
 export interface ScoreResult {

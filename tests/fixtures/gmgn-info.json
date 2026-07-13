@@ -1,0 +1,45 @@
+{
+  "code": 0,
+  "data": {
+    "address": "9eBUi9xdFphD9sASBu84XKHFzeM4hnTFBozuogWKpump",
+    "symbol": "Revival",
+    "name": "The Return of Memes",
+    "decimals": 6,
+    "holder_count": 244,
+    "circulating_supply": "999996791",
+    "total_supply": "999996791",
+    "launchpad": "pump",
+    "launchpad_platform": "Pump.fun",
+    "dev": {
+      "creator_address": "D8n8Dy6DWC9691mR4NroSA9TdxXBxDV6Rr639RapanS4",
+      "top_10_holder_rate": "0.2126",
+      "fund_from": "Pump.fun",
+      "creator_open_count": 52
+    },
+    "link": {
+      "twitter_username": "i/communities/2026404327552594417",
+      "website": "https://www.tiktok.com/@platsae/video/7661163457743555847",
+      "telegram": ""
+    },
+    "stat": {
+      "holder_count": 246,
+      "top_bundler_trader_percentage": "0.1545",
+      "top_10_holder_rate": "0.2142",
+      "dev_team_hold_rate": "0.1652237767",
+      "top70_sniper_hold_rate": "0.2911616907"
+    },
+    "wallet_tags_stat": {
+      "smart_wallets": 3,
+      "fresh_wallets": 254,
+      "renowned_wallets": 4,
+      "creator_wallets": 1,
+      "sniper_wallets": 23,
+      "rat_trader_wallets": 1,
+      "whale_wallets": 0,
+      "top_wallets": 75,
+      "bundler_wallets": 487
+    }
+  },
+  "message": "success",
+  "reason": ""
+}

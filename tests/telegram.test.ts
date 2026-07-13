@@ -99,6 +99,38 @@ describe('formatAlert', () => {
     expect(text).toContain('🎯 First 20: ?');
     expect(text).toContain('Out: ?');
   });
+
+  it('omits GMGN lines entirely when gmgn is absent (flag off / disabled default)', () => {
+    const text = formatAlert(DATA);
+    expect(text).not.toContain('Smart$');
+    expect(text).not.toContain('GMGN:');
+  });
+
+  it('renders GMGN smart-money/KOL and security cross-check lines when present', () => {
+    const text = formatAlert({
+      ...DATA,
+      gmgn: { smartMoneyCount: 3, kolCount: 4, honeypot: false, buyTaxPct: 0, sellTaxPct: 5, top10Pct: 21 },
+    });
+    expect(text).toContain('🧠 Smart$: 3 · 👑 KOL: 4');
+    expect(text).toContain('🛡 GMGN: ✅ · Tax 0%/5% · Top10 21%');
+  });
+
+  it('flags a honeypot with a warning instead of the checkmark', () => {
+    const text = formatAlert({
+      ...DATA,
+      gmgn: { smartMoneyCount: 0, kolCount: 0, honeypot: true, buyTaxPct: 99, sellTaxPct: 99, top10Pct: 90 },
+    });
+    expect(text).toContain('🛡 GMGN: ⚠️ HONEYPOT · Tax 99%/99% · Top10 90%');
+  });
+
+  it('renders GMGN unknown sub-fields as ? without dropping the lines', () => {
+    const text = formatAlert({
+      ...DATA,
+      gmgn: { smartMoneyCount: 'unknown', kolCount: 'unknown', honeypot: 'unknown', buyTaxPct: 'unknown', sellTaxPct: 'unknown', top10Pct: 'unknown' },
+    });
+    expect(text).toContain('🧠 Smart$: ? · 👑 KOL: ?');
+    expect(text).toContain('🛡 GMGN: ? · Tax ? · Top10 ?');
+  });
 });
 
 describe('formatFollowUp', () => {
