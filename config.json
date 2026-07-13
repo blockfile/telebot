@@ -58,7 +58,8 @@
     "pumpfun": true
   },
   "gmgn": {
-    "enabled": false
+    "enabled": false,
+    "rejectBad": false
   },
   "alertScoreThreshold": 60,
   "solPriceFallbackUsd": 150,

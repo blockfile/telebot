@@ -1,5 +1,5 @@
 import type { ButtonsConfig } from './config';
-import type { GmgnEnrichment } from './checks/gmgn';
+import { gmgnStars, type GmgnEnrichment } from './checks/gmgn';
 import { log } from './logger';
 
 export function escapeHtml(s: string): string {
@@ -99,16 +99,19 @@ export function formatAlert(d: AlertData): string {
   let gmgnLines: string[] = [];
   if (d.gmgn) {
     const g = d.gmgn;
+    const stars = gmgnStars(g);
+    const starStr = '⭐'.repeat(stars) + '☆'.repeat(5 - stars);
     const smart = g.smartMoneyCount === 'unknown' ? '?' : String(g.smartMoneyCount);
     const kol = g.kolCount === 'unknown' ? '?' : String(g.kolCount);
     const hp = g.honeypot === 'unknown' ? '?' : g.honeypot ? '⚠️ HONEYPOT' : '✅';
     const tax = g.buyTaxPct === 'unknown' || g.sellTaxPct === 'unknown'
       ? '?' : `${g.buyTaxPct.toFixed(0)}%/${g.sellTaxPct.toFixed(0)}%`;
     const gTop10 = g.top10Pct === 'unknown' ? '?' : `${g.top10Pct.toFixed(0)}%`;
+    const washTag = g.washTrading === true ? ' · 🧼 WASH' : '';
     gmgnLines = [
       '',
-      `🧠 Smart$: ${smart} · 👑 KOL: ${kol}`,
-      `🛡 GMGN: ${hp} · Tax ${tax} · Top10 ${gTop10}`,
+      `⭐ GMGN: ${starStr} · Smart$ ${smart} · KOL ${kol}`,
+      `🛡 Security: ${hp} · Tax ${tax} · Top10 ${gTop10}${washTag}`,
     ];
   }
 

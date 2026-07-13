@@ -49,12 +49,12 @@ describe('runDeepChecks', () => {
       deps({
         fetchGmgn: async (mint) => {
           calledWith = mint;
-          return { smartMoneyCount: 3, kolCount: 4, honeypot: false, buyTaxPct: 0, sellTaxPct: 0, top10Pct: 21 };
+          return { smartMoneyCount: 3, kolCount: 4, honeypot: false, washTrading: false, buyTaxPct: 0, sellTaxPct: 0, top10Pct: 21 };
         },
       }),
     );
     expect(calledWith).toBe('mintA');
-    expect(r.gmgn).toEqual({ smartMoneyCount: 3, kolCount: 4, honeypot: false, buyTaxPct: 0, sellTaxPct: 0, top10Pct: 21 });
+    expect(r.gmgn).toEqual({ smartMoneyCount: 3, kolCount: 4, honeypot: false, washTrading: false, buyTaxPct: 0, sellTaxPct: 0, top10Pct: 21 });
   });
 
   it("marks absent links 'unknown' and skips their checks", async () => {

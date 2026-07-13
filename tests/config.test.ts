@@ -25,9 +25,10 @@ describe('loadConfig', () => {
     expect(cfg.buttons.chart).toBe(true);
   });
 
-  it('loads gmgn config, defaulting to disabled', () => {
+  it('loads gmgn config, defaulting to disabled with aggressive rejectBad off', () => {
     const cfg = loadConfig();
     expect(cfg.gmgn.enabled).toBe(false);
+    expect(cfg.gmgn.rejectBad).toBe(false);
   });
 });
 

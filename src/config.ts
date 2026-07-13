@@ -72,9 +72,12 @@ export interface ButtonsConfig {
 }
 
 /** GMGN enrichment (security + smart-money/KOL signals on the alert card). Off by default —
- * enabling it requires both this flag AND a GMGN_API_KEY in .env (see README). */
+ * enabling it requires both this flag AND a GMGN_API_KEY in .env (see README).
+ * `rejectBad` (also default off) upgrades GMGN from a bounded score nudge to an aggressive mode
+ * that hard-rejects GMGN-confirmed honeypots / wash-trading and boosts smart-money harder. */
 export interface GmgnConfig {
   enabled: boolean;
+  rejectBad: boolean;
 }
 
 export interface AppConfig {
@@ -162,6 +165,9 @@ export function loadConfig(path = 'config.json'): AppConfig {
   }
   if (typeof cfg.gmgn?.enabled !== 'boolean') {
     throw new Error('config.json missing boolean field: gmgn.enabled');
+  }
+  if (typeof cfg.gmgn?.rejectBad !== 'boolean') {
+    throw new Error('config.json missing boolean field: gmgn.rejectBad');
   }
   return cfg;
 }

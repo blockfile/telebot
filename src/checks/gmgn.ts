@@ -14,9 +14,29 @@ export interface GmgnEnrichment {
   smartMoneyCount: Tri<number>;
   kolCount: Tri<number>;
   honeypot: Tri<boolean>;
+  washTrading: Tri<boolean>;
   buyTaxPct: Tri<number>;
   sellTaxPct: Tri<number>;
   top10Pct: Tri<number>;
+}
+
+/** A sell tax at/above this percent counts as a security negative in the star rating. */
+export const GMGN_SELL_TAX_NEG_PCT = 10;
+
+/**
+ * 1..5 quality star rating derived purely from GMGN signals. Neutral middle (3), +1 per strong
+ * positive (smart money present, KOL present), -1 per CONFIRMED negative (honeypot, wash-trading,
+ * sell-tax over ~10%). Unknown/null fields are NEUTRAL and never subtract — this is the same
+ * degrade-to-unknown doctrine the rest of the checks follow. Clamped to 1..5. Pure function,
+ * shared by the card renderer and the scorer so both agree on the rating. */
+export function gmgnStars(g: GmgnEnrichment): number {
+  let stars = 3;
+  if (typeof g.smartMoneyCount === 'number' && g.smartMoneyCount > 0) stars += 1;
+  if (typeof g.kolCount === 'number' && g.kolCount > 0) stars += 1;
+  if (g.honeypot === true) stars -= 1;
+  if (g.washTrading === true) stars -= 1;
+  if (typeof g.sellTaxPct === 'number' && g.sellTaxPct > GMGN_SELL_TAX_NEG_PCT) stars -= 1;
+  return Math.max(1, Math.min(5, stars));
 }
 
 const BASE = 'https://openapi.gmgn.ai';
@@ -54,6 +74,30 @@ function triBool(v: unknown): Tri<boolean> {
   if (v === 1 || v === true) return true;
   if (v === 0 || v === false) return false;
   return 'unknown'; // GMGN sends null for "not evaluated" — never guess "not a honeypot" from that
+}
+
+/**
+ * Wash-trading verdict for a mint. The per-token security/info endpoints don't currently carry
+ * `is_wash_trading` (only the market/rank list does), so this usually degrades to 'unknown'
+ * (neutral). Read it defensively from wherever GMGN might surface it — an explicit boolean on
+ * either payload, or a "wash" entry in security.flags — and only ever return `true` on positive
+ * evidence (never fabricate a "clean" verdict from a missing field). */
+function triWash(security: Record<string, unknown> | null, info: Record<string, unknown> | null): Tri<boolean> {
+  for (const p of [security, info]) {
+    if (!p) continue;
+    const w = triBool(p.is_wash_trading);
+    if (w !== 'unknown') return w;
+  }
+  const flags = security?.flags;
+  if (Array.isArray(flags)) {
+    for (const f of flags) {
+      const label = typeof f === 'string'
+        ? f
+        : (f && typeof f === 'object' ? String((f as Record<string, unknown>).name ?? (f as Record<string, unknown>).type ?? '') : '');
+      if (label.toLowerCase().includes('wash')) return true;
+    }
+  }
+  return 'unknown';
 }
 
 function triNum(v: unknown): Tri<number> {
@@ -116,6 +160,7 @@ export class GmgnClient {
       smartMoneyCount: info ? triNum(tags.smart_wallets) : 'unknown',
       kolCount: info ? triNum(tags.renowned_wallets) : 'unknown',
       honeypot: security ? triBool(security.is_honeypot) : 'unknown',
+      washTrading: triWash(security, info),
       buyTaxPct: security ? triPctFromFraction(security.buy_tax) : 'unknown',
       sellTaxPct: security ? triPctFromFraction(security.sell_tax) : 'unknown',
       // Prefer security's own top10 reading; fall back to info's `stat` block if only that came back.

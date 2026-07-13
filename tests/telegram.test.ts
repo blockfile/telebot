@@ -106,30 +106,43 @@ describe('formatAlert', () => {
     expect(text).not.toContain('GMGN:');
   });
 
-  it('renders GMGN smart-money/KOL and security cross-check lines when present', () => {
+  it('renders the GMGN star rating + smart-money/KOL and security cross-check lines when present', () => {
     const text = formatAlert({
       ...DATA,
-      gmgn: { smartMoneyCount: 3, kolCount: 4, honeypot: false, buyTaxPct: 0, sellTaxPct: 5, top10Pct: 21 },
+      gmgn: { smartMoneyCount: 3, kolCount: 4, honeypot: false, washTrading: false, buyTaxPct: 0, sellTaxPct: 5, top10Pct: 21 },
     });
-    expect(text).toContain('🧠 Smart$: 3 · 👑 KOL: 4');
-    expect(text).toContain('🛡 GMGN: ✅ · Tax 0%/5% · Top10 21%');
+    // smart money + KOL present, no negatives → 5★
+    expect(text).toContain('⭐ GMGN: ⭐⭐⭐⭐⭐ · Smart$ 3 · KOL 4');
+    expect(text).toContain('🛡 Security: ✅ · Tax 0%/5% · Top10 21%');
   });
 
-  it('flags a honeypot with a warning instead of the checkmark', () => {
+  it('renders a partial star bar with empty stars (☆)', () => {
     const text = formatAlert({
       ...DATA,
-      gmgn: { smartMoneyCount: 0, kolCount: 0, honeypot: true, buyTaxPct: 99, sellTaxPct: 99, top10Pct: 90 },
+      gmgn: { smartMoneyCount: 2, kolCount: 0, honeypot: false, washTrading: false, buyTaxPct: 0, sellTaxPct: 0, top10Pct: 21 },
     });
-    expect(text).toContain('🛡 GMGN: ⚠️ HONEYPOT · Tax 99%/99% · Top10 90%');
+    // smart money present only → 4★ → ⭐⭐⭐⭐☆
+    expect(text).toContain('⭐ GMGN: ⭐⭐⭐⭐☆ · Smart$ 2 · KOL 0');
   });
 
-  it('renders GMGN unknown sub-fields as ? without dropping the lines', () => {
+  it('flags a honeypot with a warning instead of the checkmark, and tags wash trading', () => {
     const text = formatAlert({
       ...DATA,
-      gmgn: { smartMoneyCount: 'unknown', kolCount: 'unknown', honeypot: 'unknown', buyTaxPct: 'unknown', sellTaxPct: 'unknown', top10Pct: 'unknown' },
+      gmgn: { smartMoneyCount: 0, kolCount: 0, honeypot: true, washTrading: true, buyTaxPct: 99, sellTaxPct: 99, top10Pct: 90 },
     });
-    expect(text).toContain('🧠 Smart$: ? · 👑 KOL: ?');
-    expect(text).toContain('🛡 GMGN: ? · Tax ? · Top10 ?');
+    // honeypot + wash + high tax, no positives → 1★ (clamped)
+    expect(text).toContain('⭐ GMGN: ⭐☆☆☆☆ · Smart$ 0 · KOL 0');
+    expect(text).toContain('🛡 Security: ⚠️ HONEYPOT · Tax 99%/99% · Top10 90% · 🧼 WASH');
+  });
+
+  it('renders GMGN unknown sub-fields as ? without dropping the lines (neutral 3★)', () => {
+    const text = formatAlert({
+      ...DATA,
+      gmgn: { smartMoneyCount: 'unknown', kolCount: 'unknown', honeypot: 'unknown', washTrading: 'unknown', buyTaxPct: 'unknown', sellTaxPct: 'unknown', top10Pct: 'unknown' },
+    });
+    // all-unknown is neutral → 3★
+    expect(text).toContain('⭐ GMGN: ⭐⭐⭐☆☆ · Smart$ ? · KOL ?');
+    expect(text).toContain('🛡 Security: ? · Tax ? · Top10 ?');
   });
 });
 

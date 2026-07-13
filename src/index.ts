@@ -200,7 +200,7 @@ async function handleTrigger(t: WatchedToken): Promise<void> {
       return;
     }
 
-    const { score, hardRejects, flags } = scoreToken(results, cfg.deep, cfg.launch);
+    const { score, hardRejects, flags } = scoreToken(results, cfg.deep, cfg.launch, cfg.gmgn);
     if (hardRejects.length || score < cfg.alertScoreThreshold) {
       db.setOutcome(t.event.mint, 'rejected_deep');
       log('info', `rejected $${t.event.symbol}: score ${score}${hardRejects.length ? `, hard: ${hardRejects.join('; ')}` : ''}`);

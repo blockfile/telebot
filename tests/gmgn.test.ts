@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { GmgnClient } from '../src/checks/gmgn';
+import { GmgnClient, gmgnStars, type GmgnEnrichment } from '../src/checks/gmgn';
 
 const SECURITY_FIXTURE = JSON.parse(readFileSync(new URL('./fixtures/gmgn-security.json', import.meta.url), 'utf8'));
 const INFO_FIXTURE = JSON.parse(readFileSync(new URL('./fixtures/gmgn-info.json', import.meta.url), 'utf8'));
@@ -33,6 +33,7 @@ describe('GmgnClient.enrich', () => {
       smartMoneyCount: 3,
       kolCount: 4,
       honeypot: 'unknown', // fixture's is_honeypot is null — never guess "not a honeypot" from that
+      washTrading: 'unknown', // per-token endpoints don't carry is_wash_trading; flags empty → unknown
       buyTaxPct: 0,
       sellTaxPct: 0,
       top10Pct: 21.42,
@@ -123,5 +124,70 @@ describe('GmgnClient.enrich', () => {
     const rFalse = await new GmgnClient('k', hpFalse).enrich('mint');
     if (rFalse === 'unknown') throw new Error('unreachable');
     expect(rFalse.honeypot).toBe(false);
+  });
+
+  it('reads is_wash_trading when GMGN provides it, else degrades to unknown', async () => {
+    const withFlag = fakeFetch({
+      '/v1/token/security': () => ({ ...SECURITY_FIXTURE, data: { ...SECURITY_FIXTURE.data, is_wash_trading: true } }),
+      '/v1/token/info': 'http500',
+    });
+    const r = await new GmgnClient('k', withFlag).enrich('mint');
+    if (r === 'unknown') throw new Error('unreachable');
+    expect(r.washTrading).toBe(true);
+
+    // The real captured fixtures carry no is_wash_trading and an empty flags[] → unknown, never false.
+    const clean = fakeFetch({ '/v1/token/security': () => SECURITY_FIXTURE, '/v1/token/info': () => INFO_FIXTURE });
+    const rc = await new GmgnClient('k', clean).enrich('mint');
+    if (rc === 'unknown') throw new Error('unreachable');
+    expect(rc.washTrading).toBe('unknown');
+  });
+
+  it('detects a wash-trading entry in the security flags array', async () => {
+    const flagged = fakeFetch({
+      '/v1/token/security': () => ({ ...SECURITY_FIXTURE, data: { ...SECURITY_FIXTURE.data, flags: ['wash_trading'] } }),
+      '/v1/token/info': 'http500',
+    });
+    const r = await new GmgnClient('k', flagged).enrich('mint');
+    if (r === 'unknown') throw new Error('unreachable');
+    expect(r.washTrading).toBe(true);
+  });
+});
+
+describe('gmgnStars', () => {
+  const g = (over: Partial<GmgnEnrichment> = {}): GmgnEnrichment => ({
+    smartMoneyCount: 0, kolCount: 0, honeypot: false, washTrading: false,
+    buyTaxPct: 0, sellTaxPct: 0, top10Pct: 20, ...over,
+  });
+
+  it('starts neutral at 3 with no positives or negatives', () => {
+    expect(gmgnStars(g())).toBe(3);
+  });
+
+  it('adds a star each for smart money present and KOL present (max via positives = 5)', () => {
+    expect(gmgnStars(g({ smartMoneyCount: 1 }))).toBe(4);
+    expect(gmgnStars(g({ kolCount: 1 }))).toBe(4);
+    expect(gmgnStars(g({ smartMoneyCount: 5, kolCount: 3 }))).toBe(5);
+  });
+
+  it('subtracts a star each for confirmed honeypot, wash trading, and sell-tax over 10%', () => {
+    expect(gmgnStars(g({ honeypot: true }))).toBe(2);
+    expect(gmgnStars(g({ washTrading: true }))).toBe(2);
+    expect(gmgnStars(g({ sellTaxPct: 11 }))).toBe(2);
+    expect(gmgnStars(g({ sellTaxPct: 10 }))).toBe(3); // exactly 10% is not "over" — stays neutral
+  });
+
+  it('treats unknown/null fields as NEUTRAL — never subtracts on unknown', () => {
+    expect(gmgnStars(g({ honeypot: 'unknown', washTrading: 'unknown', sellTaxPct: 'unknown', smartMoneyCount: 'unknown', kolCount: 'unknown' }))).toBe(3);
+  });
+
+  it('clamps to 1..5 at both ends', () => {
+    // all positives + no negatives can only reach 5
+    expect(gmgnStars(g({ smartMoneyCount: 9, kolCount: 9 }))).toBe(5);
+    // all three negatives, no positives: 3 - 3 = 0 → clamped to 1
+    expect(gmgnStars(g({ honeypot: true, washTrading: true, sellTaxPct: 50 }))).toBe(1);
+  });
+
+  it('a mixed token nets out (e.g. smart money present but a honeypot)', () => {
+    expect(gmgnStars(g({ smartMoneyCount: 2, honeypot: true }))).toBe(3); // 3 +1 -1
   });
 });
