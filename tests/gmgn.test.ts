@@ -4,6 +4,10 @@ import { GmgnClient, gmgnStars, type GmgnEnrichment } from '../src/checks/gmgn';
 
 const SECURITY_FIXTURE = JSON.parse(readFileSync(new URL('./fixtures/gmgn-security.json', import.meta.url), 'utf8'));
 const INFO_FIXTURE = JSON.parse(readFileSync(new URL('./fixtures/gmgn-info.json', import.meta.url), 'utf8'));
+// Captured live (2026-07, demo key gmgn_solbscbaseethmonadtron) against a real graduated pump.fun
+// mint (fomocat: 5cUhBj1fLteNULGTkoP7nQxGiroVusNbvhzPE9NEpump) — see graduationSnapshot's tests.
+const GRAD_INFO_FIXTURE = JSON.parse(readFileSync(new URL('./fixtures/gmgn-info-graduated.json', import.meta.url), 'utf8'));
+const GRAD_SECURITY_FIXTURE = JSON.parse(readFileSync(new URL('./fixtures/gmgn-security-graduated.json', import.meta.url), 'utf8'));
 
 type Handler = (url: URL) => unknown;
 
@@ -189,5 +193,121 @@ describe('gmgnStars', () => {
 
   it('a mixed token nets out (e.g. smart money present but a honeypot)', () => {
     expect(gmgnStars(g({ smartMoneyCount: 2, honeypot: true }))).toBe(3); // 3 +1 -1
+  });
+});
+
+describe('GmgnClient.graduationSnapshot', () => {
+  it('maps real captured graduated-mint fixtures (fomocat) into a GradSnapshot', async () => {
+    const f = fakeFetch({
+      '/v1/token/security': () => GRAD_SECURITY_FIXTURE,
+      '/v1/token/info': () => GRAD_INFO_FIXTURE,
+    });
+    const r = await new GmgnClient('demo-key', f).graduationSnapshot('5cUhBj1fLteNULGTkoP7nQxGiroVusNbvhzPE9NEpump');
+    expect(r).not.toBe('unknown');
+    if (r === 'unknown') throw new Error('unreachable');
+
+    expect(r.symbol).toBe('fomocat');
+    expect(r.name).toBe('fomocat');
+    expect(r.logo).toBe('https://gmgn.ai/external-res/4e68da0eb80e0658dfd8f40507d55cd9_v2.webp');
+    expect(r.priceUsd).toBeCloseTo(0.0000091114011, 12);
+    // marketCapUsd = price.price * circulating_supply
+    expect(r.marketCapUsd).toBeCloseTo(9111.4, 0);
+    // migration_market_cap (410.84) is quoted in SOL (migration_market_cap_quote: "SOL"), not the
+    // ~$69k a raw USD figure would suggest — converted via the documented SOL/USD fallback (150).
+    expect(r.graduationMcUsd).toBeCloseTo(61626, 0);
+    // a sane (if, at this exact live snapshot, sub-1) multiple — never NaN/Infinity
+    expect(r.marketCapUsd / r.graduationMcUsd).toBeCloseTo(0.148, 2);
+    expect(r.athPriceUsd).toBeCloseTo(0.000053902812, 12);
+    expect(r.volume1hUsd).toBeCloseTo(242365.84, 1);
+    expect(r.buys1h).toBe(4455);
+    expect(r.sells1h).toBe(3269);
+    expect(r.swaps1h).toBe(7724);
+    expect(r.holderCount).toBe(403);
+    expect(r.liquidityUsd).toBeCloseTo(6964.57, 1);
+    // priceChange1hPct = (price/price_1h - 1) * 100
+    expect(r.priceChange1hPct).toBeCloseTo(272.84, 1);
+    expect(r.honeypot).toBe('unknown'); // fixture's is_honeypot is null
+    expect(r.smartMoneyCount).toBe(11);
+    expect(r.kolCount).toBe(4);
+    expect(r.top10Pct).toBeCloseTo(17.76, 5);
+    expect(r.buyTaxPct).toBe(0);
+    expect(r.sellTaxPct).toBe(0);
+  });
+
+  it("returns 'unknown' only when BOTH token/info and token/security fail", async () => {
+    const bothFail = fakeFetch({ '/v1/token/security': 'http500', '/v1/token/info': 'http500' });
+    expect(await new GmgnClient('k', bothFail).graduationSnapshot('mint')).toBe('unknown');
+
+    const bothThrow = fakeFetch({ '/v1/token/security': 'throw', '/v1/token/info': 'throw' });
+    await expect(new GmgnClient('k', bothThrow).graduationSnapshot('mint')).resolves.toBe('unknown');
+  });
+
+  it('degrades money fields to 0 (not unknown) when token/info fails, keeping security fields', async () => {
+    const f = fakeFetch({
+      '/v1/token/security': () => GRAD_SECURITY_FIXTURE,
+      '/v1/token/info': 'http500',
+    });
+    const r = await new GmgnClient('k', f).graduationSnapshot('mint');
+    expect(r).not.toBe('unknown');
+    if (r === 'unknown') throw new Error('unreachable');
+    expect(r.marketCapUsd).toBe(0);
+    expect(r.graduationMcUsd).toBe(0);
+    expect(r.volume1hUsd).toBe(0);
+    expect(r.holderCount).toBe(0);
+    expect(r.symbol).toBe('');
+    expect(r.honeypot).toBe('unknown'); // security's own field, present
+    expect(r.buyTaxPct).toBe(0);
+    expect(r.smartMoneyCount).toBe('unknown'); // came from info, which failed
+  });
+
+  it('degrades security fields to unknown when token/security fails, keeping money fields', async () => {
+    const f = fakeFetch({
+      '/v1/token/security': 'http500',
+      '/v1/token/info': () => GRAD_INFO_FIXTURE,
+    });
+    const r = await new GmgnClient('k', f).graduationSnapshot('mint');
+    expect(r).not.toBe('unknown');
+    if (r === 'unknown') throw new Error('unreachable');
+    expect(r.marketCapUsd).toBeCloseTo(9111.4, 0);
+    expect(r.honeypot).toBe('unknown');
+    expect(r.buyTaxPct).toBe('unknown');
+    expect(r.sellTaxPct).toBe('unknown');
+    expect(r.smartMoneyCount).toBe(11);
+  });
+
+  it('treats a confirmed honeypot (is_honeypot: 1) as true', async () => {
+    const f = fakeFetch({
+      '/v1/token/security': () => ({ ...GRAD_SECURITY_FIXTURE, data: { ...GRAD_SECURITY_FIXTURE.data, is_honeypot: 1 } }),
+      '/v1/token/info': () => GRAD_INFO_FIXTURE,
+    });
+    const r = await new GmgnClient('k', f).graduationSnapshot('mint');
+    if (r === 'unknown') throw new Error('unreachable');
+    expect(r.honeypot).toBe(true);
+  });
+
+  it('passes migration_market_cap through as-is when GMGN quotes it in USD', async () => {
+    const f = fakeFetch({
+      '/v1/token/security': () => GRAD_SECURITY_FIXTURE,
+      '/v1/token/info': () => ({
+        ...GRAD_INFO_FIXTURE,
+        data: { ...GRAD_INFO_FIXTURE.data, migration_market_cap: 69000, migration_market_cap_quote: 'USD' },
+      }),
+    });
+    const r = await new GmgnClient('k', f).graduationSnapshot('mint');
+    if (r === 'unknown') throw new Error('unreachable');
+    expect(r.graduationMcUsd).toBe(69000);
+  });
+
+  it('handles a missing price_1h (0/absent) by reporting a 0% 1h change, never NaN/Infinity', async () => {
+    const f = fakeFetch({
+      '/v1/token/security': () => GRAD_SECURITY_FIXTURE,
+      '/v1/token/info': () => ({
+        ...GRAD_INFO_FIXTURE,
+        data: { ...GRAD_INFO_FIXTURE.data, price: { ...GRAD_INFO_FIXTURE.data.price, price_1h: 0 } },
+      }),
+    });
+    const r = await new GmgnClient('k', f).graduationSnapshot('mint');
+    if (r === 'unknown') throw new Error('unreachable');
+    expect(r.priceChange1hPct).toBe(0);
   });
 });

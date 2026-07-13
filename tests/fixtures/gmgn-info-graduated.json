@@ -1,0 +1,31 @@
+{
+  "code": 0,
+  "data": {
+    "address": "5cUhBj1fLteNULGTkoP7nQxGiroVusNbvhzPE9NEpump",
+    "symbol": "fomocat",
+    "name": "fomocat",
+    "logo": "https://gmgn.ai/external-res/4e68da0eb80e0658dfd8f40507d55cd9_v2.webp",
+    "holder_count": 403,
+    "circulating_supply": "999999602",
+    "total_supply": "999999602",
+    "liquidity": "6964.56869643088",
+    "migration_market_cap": 410.84,
+    "migration_market_cap_quote": "SOL",
+    "ath_price": 0.000053902812,
+    "migrated_timestamp": 1783970990,
+    "price": {
+      "price": "0.0000091114011",
+      "price_1h": "0.0000024438024",
+      "volume_1h": "242365.83690264",
+      "buys_1h": 4455,
+      "sells_1h": 3269,
+      "swaps_1h": 7724
+    },
+    "wallet_tags_stat": {
+      "smart_wallets": 11,
+      "renowned_wallets": 4
+    }
+  },
+  "message": "success",
+  "reason": ""
+}

@@ -80,6 +80,20 @@ export interface GmgnConfig {
   rejectBad: boolean;
 }
 
+/** Post-graduation monitor: watches a mint via GMGN after a pump.fun migration (PumpPortal goes
+ * blind at graduation) and alerts once it looks healthy. Off by default — enabling it requires
+ * both `enabled: true` here AND a GMGN_API_KEY in .env. Max-coverage by design: every healthy
+ * graduation alerts, the user triages (see .gmgn-gradwatch-brief.md). */
+export interface GraduationMonitorConfig {
+  enabled: boolean;
+  pollSeconds: number;
+  watchMinutes: number;
+  minVolume1hUsd: number;
+  minLiquidityUsd: number;
+  minHolders: number;
+  maxChecksPerSweep: number;
+}
+
 export interface AppConfig {
   stage1: Stage1Config;
   watch: WatchConfig;
@@ -89,6 +103,7 @@ export interface AppConfig {
   revival: RevivalConfig;
   buttons: ButtonsConfig;
   gmgn: GmgnConfig;
+  graduationMonitor: GraduationMonitorConfig;
   alertScoreThreshold: number;
   solPriceFallbackUsd: number;
   summaryHourLocal: number;
@@ -143,6 +158,12 @@ export function loadConfig(path = 'config.json'): AppConfig {
     ['revival.jumpMult', cfg.revival?.jumpMult],
     ['revival.minMcUsd', cfg.revival?.minMcUsd],
     ['revival.maxCandidates', cfg.revival?.maxCandidates],
+    ['graduationMonitor.pollSeconds', cfg.graduationMonitor?.pollSeconds],
+    ['graduationMonitor.watchMinutes', cfg.graduationMonitor?.watchMinutes],
+    ['graduationMonitor.minVolume1hUsd', cfg.graduationMonitor?.minVolume1hUsd],
+    ['graduationMonitor.minLiquidityUsd', cfg.graduationMonitor?.minLiquidityUsd],
+    ['graduationMonitor.minHolders', cfg.graduationMonitor?.minHolders],
+    ['graduationMonitor.maxChecksPerSweep', cfg.graduationMonitor?.maxChecksPerSweep],
     ['alertScoreThreshold', cfg.alertScoreThreshold],
     ['solPriceFallbackUsd', cfg.solPriceFallbackUsd],
     ['summaryHourLocal', cfg.summaryHourLocal],
@@ -168,6 +189,9 @@ export function loadConfig(path = 'config.json'): AppConfig {
   }
   if (typeof cfg.gmgn?.rejectBad !== 'boolean') {
     throw new Error('config.json missing boolean field: gmgn.rejectBad');
+  }
+  if (typeof cfg.graduationMonitor?.enabled !== 'boolean') {
+    throw new Error('config.json missing boolean field: graduationMonitor.enabled');
   }
   return cfg;
 }

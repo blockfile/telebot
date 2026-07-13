@@ -30,6 +30,17 @@ describe('loadConfig', () => {
     expect(cfg.gmgn.enabled).toBe(false);
     expect(cfg.gmgn.rejectBad).toBe(false);
   });
+
+  it('loads graduationMonitor config, defaulting to disabled, with its thresholds', () => {
+    const cfg = loadConfig();
+    expect(cfg.graduationMonitor.enabled).toBe(false);
+    expect(cfg.graduationMonitor.pollSeconds).toBe(90);
+    expect(cfg.graduationMonitor.watchMinutes).toBe(60);
+    expect(cfg.graduationMonitor.minVolume1hUsd).toBe(5000);
+    expect(cfg.graduationMonitor.minLiquidityUsd).toBe(3000);
+    expect(cfg.graduationMonitor.minHolders).toBe(30);
+    expect(cfg.graduationMonitor.maxChecksPerSweep).toBe(8);
+  });
 });
 
 describe('loadSecrets', () => {

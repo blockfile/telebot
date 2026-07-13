@@ -16,6 +16,7 @@ import { analyzeLaunch } from './checks/launchAnalysis';
 import { GmgnClient } from './checks/gmgn';
 import { FollowUps } from './pipeline/followups';
 import { RevivalWatcher } from './pipeline/revivals';
+import { GradWatch } from './pipeline/gradWatch';
 import {
   Telegram, formatAlert, formatFollowUp, buildButtons,
   type AlertData, type FollowUpData, type Keyboard, type SendResult,
@@ -40,6 +41,25 @@ const gmgnClient = cfg.gmgn.enabled ? new GmgnClient(secrets.gmgnApiKey) : null;
 if (cfg.gmgn.enabled && !secrets.gmgnApiKey) {
   log('warn', 'gmgn.enabled is true but GMGN_API_KEY is not set in .env — GMGN enrichment will fail every call and degrade to unknown on every card.');
 }
+
+// Graduation monitor: watches mints via GMGN after a PumpPortal 'migration' event (the stream
+// goes blind at graduation — this is the only post-graduation signal left). Off by default
+// (config.json graduationMonitor.enabled). Reuses the GMGN client instance above when the
+// enrichment feature already constructed one; otherwise builds its own, guarded by a real API key
+// being present — the two features are independent toggles.
+const gradGmgnClient = gmgnClient ?? (secrets.gmgnApiKey ? new GmgnClient(secrets.gmgnApiKey) : null);
+if (cfg.graduationMonitor.enabled && !secrets.gmgnApiKey) {
+  log('warn', 'graduationMonitor.enabled is true but GMGN_API_KEY is not set in .env — the graduation monitor will never find data and will never alert.');
+}
+const gradWatch = cfg.graduationMonitor.enabled && gradGmgnClient
+  ? new GradWatch({
+      gmgn: gradGmgnClient,
+      send,
+      buttons: (m) => buildButtons(m, cfg.buttons),
+      cfg: cfg.graduationMonitor,
+      log: (msg) => log('info', msg),
+    })
+  : null;
 
 async function send(payload: string | { text: string; photoUrl?: string; buttons?: Keyboard }): Promise<SendResult> {
   const p = typeof payload === 'string' ? { text: payload } : payload;
@@ -326,6 +346,7 @@ stream.on('migration', (m: MigrationEvent) => {
   // wrongly count as a whale. Blank the curve key so later follow-ups skip the re-measure.
   const fu = followUps.get(m.mint);
   if (fu) fu.bondingCurveKey = '';
+  if (cfg.graduationMonitor.enabled) gradWatch?.add(m.mint, Date.now());
 });
 stream.on('status', (s: string) => log('info', `stream: ${s}`));
 stream.connect();
@@ -343,6 +364,11 @@ setInterval(() => {
     sweeping = true;
     void revivals.sweep().finally(() => { sweeping = false; });
   }, cfg.revival.sweepMinutes * 60_000);
+  t.unref();
+}
+
+if (cfg.graduationMonitor.enabled && secrets.gmgnApiKey && gradWatch) {
+  const t = setInterval(() => void gradWatch.sweep(Date.now()), cfg.graduationMonitor.pollSeconds * 1000);
   t.unref();
 }
 

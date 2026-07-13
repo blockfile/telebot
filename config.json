@@ -61,6 +61,15 @@
     "enabled": false,
     "rejectBad": false
   },
+  "graduationMonitor": {
+    "enabled": false,
+    "pollSeconds": 90,
+    "watchMinutes": 60,
+    "minVolume1hUsd": 5000,
+    "minLiquidityUsd": 3000,
+    "minHolders": 30,
+    "maxChecksPerSweep": 8
+  },
   "alertScoreThreshold": 60,
   "solPriceFallbackUsd": 150,
   "summaryHourLocal": 9

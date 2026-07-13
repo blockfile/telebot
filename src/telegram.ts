@@ -1,5 +1,5 @@
 import type { ButtonsConfig } from './config';
-import { gmgnStars, type GmgnEnrichment } from './checks/gmgn';
+import { gmgnStars, type GmgnEnrichment, type GradSnapshot } from './checks/gmgn';
 import { log } from './logger';
 
 export function escapeHtml(s: string): string {
@@ -148,6 +148,47 @@ export function formatAlert(d: AlertData): string {
     '',
     `<code>${d.mint}</code>`, // tap to copy — links are the buttons below
   );
+  return lines.join('\n');
+}
+
+/**
+ * Graduation-monitor alert card: built entirely from a `GradSnapshot` (no mint/CA — the caller
+ * appends the `<code>{mint}</code>` footer, since GradSnapshot intentionally doesn't carry it).
+ * Reuses `gmgnStars` by shaping the snapshot's security fields into a `GmgnEnrichment`-like object
+ * (washTrading is 'unknown' — GradSnapshot doesn't carry a wash-trading verdict).
+ */
+export function formatGraduation(s: GradSnapshot): string {
+  const usd = (v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v.toFixed(0)}`);
+  const mult = s.graduationMcUsd > 0 ? s.marketCapUsd / s.graduationMcUsd : 0;
+
+  const g: GmgnEnrichment = {
+    smartMoneyCount: s.smartMoneyCount, kolCount: s.kolCount,
+    honeypot: s.honeypot, washTrading: 'unknown',
+    buyTaxPct: s.buyTaxPct, sellTaxPct: s.sellTaxPct, top10Pct: s.top10Pct,
+  };
+  const stars = gmgnStars(g);
+  const starStr = '⭐'.repeat(stars) + '☆'.repeat(5 - stars);
+  const smart = s.smartMoneyCount === 'unknown' ? '?' : String(s.smartMoneyCount);
+  const kol = s.kolCount === 'unknown' ? '?' : String(s.kolCount);
+  const hpTag = s.honeypot === true ? ' · ⚠️ HONEYPOT' : '';
+
+  // ATH market cap is derivable from the snapshot's own fields (ath_price scaled by the same
+  // price->MC ratio as the current market cap) without needing a separate supply field.
+  const athMcUsd = s.priceUsd > 0 && s.athPriceUsd > 0 ? (s.athPriceUsd / s.priceUsd) * s.marketCapUsd : 0;
+  const athPart = athMcUsd > 0 ? ` • ATH ~${usd(athMcUsd)}` : '';
+
+  const top10 = s.top10Pct === 'unknown' ? '?' : `${s.top10Pct.toFixed(0)}%`;
+
+  const lines = [
+    `🎓 <b>$${escapeHtml(s.symbol)}</b> • ${escapeHtml(s.name)} — GRADUATED`,
+    `⭐ GMGN: ${starStr} · 🧠 Smart: ${smart} · 👑 KOL: ${kol}${hpTag}`,
+    '',
+    `💰 MC: ${usd(s.marketCapUsd)} • ⇡ ${mult.toFixed(1)}× from grad${athPart}`,
+    `💧 Liq: ${usd(s.liquidityUsd)}`,
+    `📊 Vol 1h: ${usd(s.volume1hUsd)} • ${s.swaps1h} swaps (${s.buys1h}/${s.sells1h})`,
+    `👥 Holders: ${s.holderCount}`,
+    `🏆 Top 10: ${top10}`,
+  ];
   return lines.join('\n');
 }
 
