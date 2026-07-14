@@ -201,18 +201,20 @@ describe('formatFollowUp', () => {
 
 const GRAD: GradSnapshot = {
   symbol: 'FOMO', name: 'fomocat', logo: 'https://img/logo.png',
-  priceUsd: 0.0000091114011, marketCapUsd: 9111.4, graduationMcUsd: 61626, athPriceUsd: 0.000053902812,
+  priceUsd: 0.0000091114011, marketCapUsd: 9111.4, graduationMcSol: 410.84, athPriceUsd: 0.000053902812,
   volume1hUsd: 242365.84, buys1h: 4455, sells1h: 3269, swaps1h: 7724,
   holderCount: 403, liquidityUsd: 6964.57, priceChange1hPct: 272.84,
   honeypot: false, smartMoneyCount: 11, kolCount: 4,
   top10Pct: 17.76, buyTaxPct: 0, sellTaxPct: 0,
 };
+// At $150/SOL the grad MC is 410.84 * 150 ≈ $61,626, so 9111.4 / 61626 ≈ 0.148× here.
+const SOL_USD = 150;
 
 describe('formatGraduation', () => {
   it('renders the header, the mult× line, vol/holders, and the star line', () => {
-    const text = formatGraduation(GRAD);
+    const text = formatGraduation(GRAD, SOL_USD);
     expect(text).toContain('🎓 <b>$FOMO</b> • fomocat — GRADUATED');
-    // marketCapUsd / graduationMcUsd = 9111.4 / 61626 ≈ 0.1478 -> 0.1×
+    // marketCapUsd / (graduationMcSol * solUsd) = 9111.4 / 61626 ≈ 0.1478 -> 0.1×
     expect(text).toContain('💰 MC: $9.1k • ⇡ 0.1× from grad');
     expect(text).toContain('💧 Liq: $7.0k');
     expect(text).toContain('📊 Vol 1h: $242.4k • 7724 swaps (4455/3269)');
@@ -222,42 +224,52 @@ describe('formatGraduation', () => {
     expect(text).toContain('⭐ GMGN: ⭐⭐⭐⭐⭐ · 🧠 Smart: 11 · 👑 KOL: 4');
   });
 
+  it('uses the LIVE SOL price to compute the ×from-grad multiple', () => {
+    // A graduate up 2× from grad: current MC = 2 × (grad SOL × solUsd). With grad 400 SOL @ $150,
+    // grad MC = $60k, so marketCapUsd $120k -> exactly 2.0×.
+    const text = formatGraduation({ ...GRAD, graduationMcSol: 400, marketCapUsd: 120000 }, 150);
+    expect(text).toContain('⇡ 2.0× from grad');
+    // Same snapshot, a higher SOL price raises the grad MC and lowers the multiple.
+    const pricier = formatGraduation({ ...GRAD, graduationMcSol: 400, marketCapUsd: 120000 }, 300);
+    expect(pricier).toContain('⇡ 1.0× from grad'); // grad MC now $120k -> 1.0×
+  });
+
   it('derives and appends an ATH market cap when priceUsd/athPriceUsd allow it', () => {
-    const text = formatGraduation(GRAD);
+    const text = formatGraduation(GRAD, SOL_USD);
     // athMcUsd = (athPriceUsd / priceUsd) * marketCapUsd ≈ 53902.8
     expect(text).toContain('ATH ~$53.9k');
   });
 
   it('omits the ATH figure when it is not derivable (priceUsd is 0)', () => {
-    const text = formatGraduation({ ...GRAD, priceUsd: 0 });
+    const text = formatGraduation({ ...GRAD, priceUsd: 0 }, SOL_USD);
     expect(text).not.toContain('ATH');
   });
 
   it('appends an inline HONEYPOT warning to the star line when confirmed', () => {
-    const text = formatGraduation({ ...GRAD, honeypot: true });
+    const text = formatGraduation({ ...GRAD, honeypot: true }, SOL_USD);
     expect(text).toContain('⚠️ HONEYPOT');
   });
 
   it('does not warn on an unconfirmed (unknown/false) honeypot verdict', () => {
-    expect(formatGraduation(GRAD)).not.toContain('HONEYPOT');
-    expect(formatGraduation({ ...GRAD, honeypot: 'unknown' })).not.toContain('HONEYPOT');
+    expect(formatGraduation(GRAD, SOL_USD)).not.toContain('HONEYPOT');
+    expect(formatGraduation({ ...GRAD, honeypot: 'unknown' }, SOL_USD)).not.toContain('HONEYPOT');
   });
 
   it('renders unknown security counts as ? and top10 as ?', () => {
     const text = formatGraduation({
       ...GRAD, smartMoneyCount: 'unknown', kolCount: 'unknown', top10Pct: 'unknown',
-    });
+    }, SOL_USD);
     expect(text).toContain('🧠 Smart: ? · 👑 KOL: ?');
     expect(text).toContain('🏆 Top 10: ?');
   });
 
-  it('reports a 0× multiple (never NaN/Infinity) when graduationMcUsd is 0', () => {
-    const text = formatGraduation({ ...GRAD, graduationMcUsd: 0 });
+  it('reports a 0× multiple (never NaN/Infinity) when graduationMcSol is 0', () => {
+    const text = formatGraduation({ ...GRAD, graduationMcSol: 0 }, SOL_USD);
     expect(text).toContain('⇡ 0.0× from grad');
   });
 
   it('does not include a mint/CA line — the caller appends it', () => {
-    expect(formatGraduation(GRAD)).not.toContain('<code>');
+    expect(formatGraduation(GRAD, SOL_USD)).not.toContain('<code>');
   });
 });
 

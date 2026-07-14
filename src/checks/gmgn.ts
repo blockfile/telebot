@@ -126,7 +126,10 @@ export interface GradSnapshot {
   logo?: string;
   priceUsd: number;
   marketCapUsd: number;
-  graduationMcUsd: number;
+  /** RAW graduation market cap in SOL (GMGN's `migration_market_cap`, quoted in SOL on pump.fun).
+   * Left un-converted here so the caller can multiply by the LIVE SOL/USD price — the 1.5×
+   * graduation trigger depends on it, so a static fallback wouldn't be accurate enough. */
+  graduationMcSol: number;
   athPriceUsd: number;
   volume1hUsd: number;
   buys1h: number;
@@ -142,21 +145,6 @@ export interface GradSnapshot {
   buyTaxPct: Tri<number>;
   sellTaxPct: Tri<number>;
 }
-
-/**
- * SOL/USD used ONLY to convert GMGN's SOL-denominated `migration_market_cap` into a display USD
- * figure. Verified live (demo key `gmgn_solbscbaseethmonadtron`, real graduated mint `fomocat` —
- * 5cUhBj1fLteNULGTkoP7nQxGiroVusNbvhzPE9NEpump): `migration_market_cap: 410.84`,
- * `migration_market_cap_quote: "SOL"`. 410.84 as a raw USD number is nowhere near pump.fun's
- * famous ~$69k graduation market cap, but 410.84 SOL is (~$61.6k at $150/SOL) — so it's SOL, not
- * USD, confirmed by the API's own quote field. `GmgnClient` is intentionally a bare
- * apiKey+fetch client (see its constructor) with no live-price dependency threaded in — adding one
- * just for this single display number isn't worth the extra coupling — so this mirrors the app's
- * own `config.json` `solPriceFallbackUsd` static fallback. It only affects the "×from grad"
- * display line, never the health gate (volume/liquidity/holders below are already USD-native from
- * GMGN's own `price`/`liquidity` fields).
- */
-const GRAD_SOL_USD_FALLBACK = 150;
 
 /** Numeric-ish value → a finite number, defaulting to 0 (never 'unknown') — see GradSnapshot doc. */
 function numOr0(v: unknown): number {
@@ -243,13 +231,10 @@ export class GmgnClient {
     const circulatingSupply = info ? numOr0(info.circulating_supply) : 0;
     const marketCapUsd = priceUsd * circulatingSupply;
 
-    // See GRAD_SOL_USD_FALLBACK's doc: migration_market_cap is SOL-denominated on pump.fun.
-    // Pass it through as-is on the off chance GMGN ever quotes it directly in USD.
-    const rawGraduationMc = info ? numOr0(info.migration_market_cap) : 0;
-    const graduationMcQuote = typeof info?.migration_market_cap_quote === 'string'
-      ? info.migration_market_cap_quote.toUpperCase()
-      : '';
-    const graduationMcUsd = graduationMcQuote === 'USD' ? rawGraduationMc : rawGraduationMc * GRAD_SOL_USD_FALLBACK;
+    // migration_market_cap is SOL-denominated on pump.fun (confirmed live: fomocat returned
+    // migration_market_cap: 410.84 with migration_market_cap_quote: "SOL"). Passed through RAW —
+    // the caller multiplies by the live SOL/USD price for the 1.5× graduation trigger.
+    const graduationMcSol = info ? numOr0(info.migration_market_cap) : 0;
 
     const price1h = info ? numOr0(price.price_1h) : 0;
     const priceChange1hPct = price1h > 0 ? (priceUsd / price1h - 1) * 100 : 0;
@@ -260,7 +245,7 @@ export class GmgnClient {
       logo: info && typeof info.logo === 'string' ? info.logo : undefined,
       priceUsd,
       marketCapUsd,
-      graduationMcUsd,
+      graduationMcSol,
       athPriceUsd: info ? numOr0(info.ath_price) : 0,
       volume1hUsd: info ? numOr0(price.volume_1h) : 0,
       buys1h: info ? numOr0(price.buys_1h) : 0,

@@ -36,10 +36,12 @@ describe('loadConfig', () => {
     expect(cfg.graduationMonitor.enabled).toBe(false);
     expect(cfg.graduationMonitor.pollSeconds).toBe(90);
     expect(cfg.graduationMonitor.watchMinutes).toBe(60);
-    expect(cfg.graduationMonitor.minVolume1hUsd).toBe(5000);
+    expect(cfg.graduationMonitor.minMultiple).toBe(1.5);
     expect(cfg.graduationMonitor.minLiquidityUsd).toBe(3000);
-    expect(cfg.graduationMonitor.minHolders).toBe(30);
     expect(cfg.graduationMonitor.maxChecksPerSweep).toBe(8);
+    // the old volume/holders health floors were replaced by the multiple gate
+    expect('minVolume1hUsd' in cfg.graduationMonitor).toBe(false);
+    expect('minHolders' in cfg.graduationMonitor).toBe(false);
   });
 });
 

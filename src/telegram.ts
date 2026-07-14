@@ -152,14 +152,17 @@ export function formatAlert(d: AlertData): string {
 }
 
 /**
- * Graduation-monitor alert card: built entirely from a `GradSnapshot` (no mint/CA — the caller
- * appends the `<code>{mint}</code>` footer, since GradSnapshot intentionally doesn't carry it).
- * Reuses `gmgnStars` by shaping the snapshot's security fields into a `GmgnEnrichment`-like object
+ * Graduation-monitor alert card: built from a `GradSnapshot` plus the LIVE SOL/USD price used to
+ * convert the snapshot's SOL-denominated `graduationMcSol` into USD — so the "×from grad" line
+ * matches the same multiple the watcher gated on. No mint/CA (the caller appends the
+ * `<code>{mint}</code>` footer, since GradSnapshot intentionally doesn't carry it). Reuses
+ * `gmgnStars` by shaping the snapshot's security fields into a `GmgnEnrichment`-like object
  * (washTrading is 'unknown' — GradSnapshot doesn't carry a wash-trading verdict).
  */
-export function formatGraduation(s: GradSnapshot): string {
+export function formatGraduation(s: GradSnapshot, solUsd: number): string {
   const usd = (v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v.toFixed(0)}`);
-  const mult = s.graduationMcUsd > 0 ? s.marketCapUsd / s.graduationMcUsd : 0;
+  const graduationMcUsd = s.graduationMcSol * solUsd;
+  const mult = graduationMcUsd > 0 ? s.marketCapUsd / graduationMcUsd : 0;
 
   const g: GmgnEnrichment = {
     smartMoneyCount: s.smartMoneyCount, kolCount: s.kolCount,

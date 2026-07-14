@@ -212,11 +212,11 @@ describe('GmgnClient.graduationSnapshot', () => {
     expect(r.priceUsd).toBeCloseTo(0.0000091114011, 12);
     // marketCapUsd = price.price * circulating_supply
     expect(r.marketCapUsd).toBeCloseTo(9111.4, 0);
-    // migration_market_cap (410.84) is quoted in SOL (migration_market_cap_quote: "SOL"), not the
-    // ~$69k a raw USD figure would suggest — converted via the documented SOL/USD fallback (150).
-    expect(r.graduationMcUsd).toBeCloseTo(61626, 0);
-    // a sane (if, at this exact live snapshot, sub-1) multiple — never NaN/Infinity
-    expect(r.marketCapUsd / r.graduationMcUsd).toBeCloseTo(0.148, 2);
+    // migration_market_cap (410.84) is passed through RAW in SOL (migration_market_cap_quote: "SOL")
+    // — the caller multiplies by the live SOL/USD price to get the multiple.
+    expect(r.graduationMcSol).toBeCloseTo(410.84, 2);
+    // at ~$150/SOL that's ~$61.6k grad MC, so a sane sub-1 multiple here — never NaN/Infinity
+    expect(r.marketCapUsd / (r.graduationMcSol * 150)).toBeCloseTo(0.148, 2);
     expect(r.athPriceUsd).toBeCloseTo(0.000053902812, 12);
     expect(r.volume1hUsd).toBeCloseTo(242365.84, 1);
     expect(r.buys1h).toBe(4455);
@@ -251,7 +251,7 @@ describe('GmgnClient.graduationSnapshot', () => {
     expect(r).not.toBe('unknown');
     if (r === 'unknown') throw new Error('unreachable');
     expect(r.marketCapUsd).toBe(0);
-    expect(r.graduationMcUsd).toBe(0);
+    expect(r.graduationMcSol).toBe(0);
     expect(r.volume1hUsd).toBe(0);
     expect(r.holderCount).toBe(0);
     expect(r.symbol).toBe('');
@@ -285,17 +285,17 @@ describe('GmgnClient.graduationSnapshot', () => {
     expect(r.honeypot).toBe(true);
   });
 
-  it('passes migration_market_cap through as-is when GMGN quotes it in USD', async () => {
+  it('carries migration_market_cap through RAW (SOL) without converting', async () => {
     const f = fakeFetch({
       '/v1/token/security': () => GRAD_SECURITY_FIXTURE,
       '/v1/token/info': () => ({
         ...GRAD_INFO_FIXTURE,
-        data: { ...GRAD_INFO_FIXTURE.data, migration_market_cap: 69000, migration_market_cap_quote: 'USD' },
+        data: { ...GRAD_INFO_FIXTURE.data, migration_market_cap: 420 },
       }),
     });
     const r = await new GmgnClient('k', f).graduationSnapshot('mint');
     if (r === 'unknown') throw new Error('unreachable');
-    expect(r.graduationMcUsd).toBe(69000);
+    expect(r.graduationMcSol).toBe(420);
   });
 
   it('handles a missing price_1h (0/absent) by reporting a 0% 1h change, never NaN/Infinity', async () => {

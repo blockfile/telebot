@@ -56,6 +56,7 @@ const gradWatch = cfg.graduationMonitor.enabled && gradGmgnClient
       gmgn: gradGmgnClient,
       send,
       buttons: (m) => buildButtons(m, cfg.buttons),
+      solUsd: () => solPrice.usd,
       cfg: cfg.graduationMonitor,
       log: (msg) => log('info', msg),
     })

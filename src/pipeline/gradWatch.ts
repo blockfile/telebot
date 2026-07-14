@@ -6,6 +6,8 @@ export interface GradWatchDeps {
   gmgn: { graduationSnapshot(mint: string): Promise<Tri<GradSnapshot>> };
   send: (payload: { text: string; photoUrl?: string; buttons?: Keyboard }) => Promise<{ ok: boolean }>;
   buttons: (mint: string) => Keyboard;
+  /** Live SOL/USD price — the graduation-MC (SOL) is converted with this to compute the multiple. */
+  solUsd: () => number;
   cfg: GraduationMonitorConfig;
   log?: (msg: string) => void;
 }
@@ -67,13 +69,17 @@ export class GradWatch {
           continue;
         }
 
-        const healthy = snap.volume1hUsd >= this.deps.cfg.minVolume1hUsd
-          && snap.liquidityUsd >= this.deps.cfg.minLiquidityUsd
-          && snap.holderCount >= this.deps.cfg.minHolders;
-        if (!healthy) continue; // present but below the floors — keep watching, may pick up volume
+        // Trigger on a multiple off the graduation market cap (Ivan wants runners, not just
+        // "healthy"), keeping a liquidity floor as a sanity check so a thin-book pump doesn't fire.
+        const solUsd = this.deps.solUsd();
+        const graduationMcUsd = snap.graduationMcSol * solUsd;
+        const mult = graduationMcUsd > 0 ? snap.marketCapUsd / graduationMcUsd : 0;
+        const triggered = mult >= this.deps.cfg.minMultiple
+          && snap.liquidityUsd >= this.deps.cfg.minLiquidityUsd;
+        if (!triggered) continue; // below the multiple — keep watching, it may pump into it
 
-        const text = `${formatGraduation(snap)}\n\n<code>${w.mint}</code>`;
-        const result = await this.deps.send({ text, photoUrl: snap.logo, buttons: this.deps.buttons(w.mint) });
+        const text = `${formatGraduation(snap, solUsd)}\n\n<code>${w.mint}</code>`;
+        const result = await this.deps.send({ text, buttons: this.deps.buttons(w.mint) });
         if (result.ok) {
           this.alerted.add(w.mint);
           this.watched.delete(w.mint);

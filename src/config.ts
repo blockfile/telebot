@@ -88,9 +88,9 @@ export interface GraduationMonitorConfig {
   enabled: boolean;
   pollSeconds: number;
   watchMinutes: number;
-  minVolume1hUsd: number;
+  /** Alert once current MC is at least this multiple of the graduation MC (e.g. 1.5 = up 50%). */
+  minMultiple: number;
   minLiquidityUsd: number;
-  minHolders: number;
   maxChecksPerSweep: number;
 }
 
@@ -160,9 +160,8 @@ export function loadConfig(path = 'config.json'): AppConfig {
     ['revival.maxCandidates', cfg.revival?.maxCandidates],
     ['graduationMonitor.pollSeconds', cfg.graduationMonitor?.pollSeconds],
     ['graduationMonitor.watchMinutes', cfg.graduationMonitor?.watchMinutes],
-    ['graduationMonitor.minVolume1hUsd', cfg.graduationMonitor?.minVolume1hUsd],
+    ['graduationMonitor.minMultiple', cfg.graduationMonitor?.minMultiple],
     ['graduationMonitor.minLiquidityUsd', cfg.graduationMonitor?.minLiquidityUsd],
-    ['graduationMonitor.minHolders', cfg.graduationMonitor?.minHolders],
     ['graduationMonitor.maxChecksPerSweep', cfg.graduationMonitor?.maxChecksPerSweep],
     ['alertScoreThreshold', cfg.alertScoreThreshold],
     ['solPriceFallbackUsd', cfg.solPriceFallbackUsd],

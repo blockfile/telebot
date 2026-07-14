@@ -65,9 +65,8 @@
     "enabled": false,
     "pollSeconds": 90,
     "watchMinutes": 60,
-    "minVolume1hUsd": 5000,
+    "minMultiple": 1.5,
     "minLiquidityUsd": 3000,
-    "minHolders": 30,
     "maxChecksPerSweep": 8
   },
   "alertScoreThreshold": 60,

@@ -5,13 +5,17 @@ import type { GraduationMonitorConfig } from '../src/config';
 
 const CFG: GraduationMonitorConfig = {
   enabled: true, pollSeconds: 90, watchMinutes: 60,
-  minVolume1hUsd: 5000, minLiquidityUsd: 3000, minHolders: 30, maxChecksPerSweep: 8,
+  minMultiple: 1.5, minLiquidityUsd: 3000, maxChecksPerSweep: 8,
 };
 
+const SOL_USD = 150;
+
+// Default snapshot TRIGGERS: grad 400 SOL @ $150 = $60k grad MC, current $120k -> 2.0× (>= 1.5),
+// liquidity $5k (>= $3k floor), honeypot false.
 function snap(over: Partial<GradSnapshot> = {}): GradSnapshot {
   return {
     symbol: 'FOMO', name: 'fomocat', logo: 'https://img/logo.png',
-    priceUsd: 0.001, marketCapUsd: 20000, graduationMcUsd: 61626, athPriceUsd: 0.002,
+    priceUsd: 0.001, marketCapUsd: 120000, graduationMcSol: 400, athPriceUsd: 0.002,
     volume1hUsd: 10000, buys1h: 100, sells1h: 80, swaps1h: 180,
     holderCount: 60, liquidityUsd: 5000, priceChange1hPct: 12,
     honeypot: false, smartMoneyCount: 3, kolCount: 1,
@@ -24,6 +28,7 @@ function harness(overrides: {
   cfg?: GraduationMonitorConfig;
   graduationSnapshot?: (mint: string) => Promise<Tri<GradSnapshot>>;
   sendOk?: boolean;
+  solUsd?: () => number;
 } = {}) {
   const sent: Array<{ text: string; photoUrl?: string; buttons?: unknown }> = [];
   const calls: string[] = [];
@@ -33,6 +38,7 @@ function harness(overrides: {
     gmgn: { graduationSnapshot: (mint: string) => { calls.push(mint); return gmgnFn(mint); } },
     send: async (payload) => { sent.push(payload); return { ok: overrides.sendOk ?? true }; },
     buttons: () => [[{ text: 'Chart', url: 'https://c' }]],
+    solUsd: overrides.solUsd ?? (() => SOL_USD),
     cfg: overrides.cfg ?? CFG,
     log: (msg) => logs.push(msg),
   };
@@ -54,26 +60,35 @@ describe('GradWatch', () => {
     watch.add('m1', 0);
     watch.add('m1', 0); // duplicate while watched -> no-op
     expect(watch.size).toBe(1);
-    await watch.sweep(0); // healthy -> alerts and removes from watch
+    await watch.sweep(0); // above the multiple -> alerts and removes from watch
     expect(watch.size).toBe(0);
     watch.add('m1', 0); // already alerted -> no-op
     expect(watch.size).toBe(0);
     expect(calls).toEqual(['m1']); // never re-checked after being alerted
   });
 
-  it('a healthy snapshot sends one alert and marks it alerted; a second sweep does not resend', async () => {
+  it('a snapshot at/above the multiple sends one alert and marks it alerted; a second sweep does not resend', async () => {
     const { watch, sent, calls } = harness({ graduationSnapshot: async () => snap() });
     watch.add('mint1', 0);
     await watch.sweep(1000);
     expect(sent).toHaveLength(1);
     expect(sent[0].text).toContain('$FOMO');
     expect(sent[0].text).toContain('<code>mint1</code>');
-    expect(sent[0].photoUrl).toBe('https://img/logo.png');
+    expect(sent[0].text).toContain('⇡ 2.0× from grad'); // gate multiple shown on the card
     expect(watch.size).toBe(0);
 
     await watch.sweep(2000);
     expect(sent).toHaveLength(1); // not resent
     expect(calls).toEqual(['mint1']); // not re-checked once alerted
+  });
+
+  it('sends text + buttons only — never a photo/image preview on the graduation card', async () => {
+    const { watch, sent } = harness({ graduationSnapshot: async () => snap() });
+    watch.add('mint1', 0);
+    await watch.sweep(1000);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].photoUrl).toBeUndefined(); // no image, even though snap.logo is set
+    expect(sent[0].buttons).toEqual([[{ text: 'Chart', url: 'https://c' }]]);
   });
 
   it('a confirmed honeypot is dropped without sending', async () => {
@@ -95,35 +110,51 @@ describe('GradWatch', () => {
     expect(sent).toHaveLength(0);
     expect(watch.size).toBe(1); // still watched
     await watch.sweep(2000);
-    expect(sent).toHaveLength(1); // second sweep found data and it was healthy
+    expect(sent).toHaveLength(1); // second sweep found data and it was above the multiple
     expect(calls).toBe(2);
   });
 
-  it('a snapshot below the health floors is kept watching (not dropped, not alerted)', async () => {
-    const { watch, sent } = harness({
-      graduationSnapshot: async () => snap({ volume1hUsd: 100 }), // well below minVolume1hUsd
-    });
+  it('a snapshot below the multiple is kept watching (not dropped, not alerted)', async () => {
+    // grad 400 SOL @ $150 = $60k; current $60k -> exactly 1.0× < 1.5 minMultiple
+    const { watch, sent } = harness({ graduationSnapshot: async () => snap({ marketCapUsd: 60000 }) });
     watch.add('cold1', 0);
     await watch.sweep(1000);
     expect(sent).toHaveLength(0);
     expect(watch.size).toBe(1);
   });
 
-  it('each health floor (volume, liquidity, holders) independently gates the alert', async () => {
-    const belowLiquidity = harness({ graduationSnapshot: async () => snap({ liquidityUsd: 100 }) });
-    belowLiquidity.watch.add('a', 0);
-    await belowLiquidity.watch.sweep(1000);
-    expect(belowLiquidity.sent).toHaveLength(0);
+  it('gates on the multiple AND the liquidity sanity floor independently', async () => {
+    // above the multiple (2.0×) but below the liquidity floor -> no alert
+    const thinBook = harness({ graduationSnapshot: async () => snap({ liquidityUsd: 100 }) });
+    thinBook.watch.add('a', 0);
+    await thinBook.watch.sweep(1000);
+    expect(thinBook.sent).toHaveLength(0);
 
-    const belowHolders = harness({ graduationSnapshot: async () => snap({ holderCount: 5 }) });
-    belowHolders.watch.add('b', 0);
-    await belowHolders.watch.sweep(1000);
-    expect(belowHolders.sent).toHaveLength(0);
+    // above the liquidity floor but below the multiple (1.0×) -> no alert
+    const belowMult = harness({ graduationSnapshot: async () => snap({ marketCapUsd: 60000 }) });
+    belowMult.watch.add('b', 0);
+    await belowMult.watch.sweep(1000);
+    expect(belowMult.sent).toHaveLength(0);
 
-    const healthy = harness({ graduationSnapshot: async () => snap() });
-    healthy.watch.add('c', 0);
-    await healthy.watch.sweep(1000);
-    expect(healthy.sent).toHaveLength(1);
+    // both satisfied -> alert
+    const good = harness({ graduationSnapshot: async () => snap() });
+    good.watch.add('c', 0);
+    await good.watch.sweep(1000);
+    expect(good.sent).toHaveLength(1);
+  });
+
+  it('uses the LIVE SOL price for the multiple: a higher SOL price can gate a fire out', async () => {
+    // current $90k, grad 400 SOL. @ $150 grad MC=$60k -> 1.5× (fires). @ $300 grad MC=$120k -> 0.75×.
+    const fires = harness({ graduationSnapshot: async () => snap({ marketCapUsd: 90000 }), solUsd: () => 150 });
+    fires.watch.add('x', 0);
+    await fires.watch.sweep(1000);
+    expect(fires.sent).toHaveLength(1);
+
+    const held = harness({ graduationSnapshot: async () => snap({ marketCapUsd: 90000 }), solUsd: () => 300 });
+    held.watch.add('y', 0);
+    await held.watch.sweep(1000);
+    expect(held.sent).toHaveLength(0);
+    expect(held.watch.size).toBe(1); // still watched, may pump into the multiple
   });
 
   it('a mint past watchMinutes is dropped without ever being checked again', async () => {
@@ -136,10 +167,10 @@ describe('GradWatch', () => {
     expect(logs.some((l) => l.includes('expired'))).toBe(true);
   });
 
-  it('a below-floor snapshot is dropped once it passes watchMinutes', async () => {
-    const { watch, sent } = harness({ graduationSnapshot: async () => snap({ volume1hUsd: 0 }) });
+  it('a below-multiple snapshot is dropped once it passes watchMinutes', async () => {
+    const { watch, sent } = harness({ graduationSnapshot: async () => snap({ marketCapUsd: 60000 }) });
     watch.add('cold2', 0);
-    await watch.sweep(1000); // below floor, kept
+    await watch.sweep(1000); // below multiple, kept
     expect(watch.size).toBe(1);
     await watch.sweep(61 * 60_000 + 1); // now expired
     expect(watch.size).toBe(0);
@@ -148,13 +179,14 @@ describe('GradWatch', () => {
 
   it('maxChecksPerSweep bounds the number of gmgn calls in a single sweep', async () => {
     const cfg = { ...CFG, maxChecksPerSweep: 3 };
-    const { watch, calls } = harness({ cfg, graduationSnapshot: async () => snap({ volume1hUsd: 0 }) }); // kept watching
+    // below the multiple so they stay watched sweep-to-sweep
+    const { watch, calls } = harness({ cfg, graduationSnapshot: async () => snap({ marketCapUsd: 60000 }) });
     for (let i = 0; i < 8; i++) watch.add(`m${i}`, 0);
     await watch.sweep(1000);
     expect(calls).toEqual(['m0', 'm1', 'm2']); // only the first 3 mints are checked this sweep
     await watch.sweep(2000);
     // still none of these were ever dropped, so the same front-of-list 3 are checked again —
-    // m3..m7 are never reached while m0..m2 stay below the health floor
+    // m3..m7 are never reached while m0..m2 stay below the multiple
     expect(calls).toEqual(['m0', 'm1', 'm2', 'm0', 'm1', 'm2']);
   });
 
