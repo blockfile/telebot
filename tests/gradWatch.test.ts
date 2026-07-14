@@ -82,12 +82,12 @@ describe('GradWatch', () => {
     expect(calls).toEqual(['mint1']); // not re-checked once alerted
   });
 
-  it('sends text + buttons only — never a photo/image preview on the graduation card', async () => {
+  it('attaches the DexScreener CDN image (by mint) and the buttons', async () => {
     const { watch, sent } = harness({ graduationSnapshot: async () => snap() });
     watch.add('mint1', 0);
     await watch.sweep(1000);
     expect(sent).toHaveLength(1);
-    expect(sent[0].photoUrl).toBeUndefined(); // no image, even though snap.logo is set
+    expect(sent[0].photoUrl).toBe('https://dd.dexscreener.com/ds-data/tokens/solana/mint1.png');
     expect(sent[0].buttons).toEqual([[{ text: 'Chart', url: 'https://c' }]]);
   });
 

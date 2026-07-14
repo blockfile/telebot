@@ -79,7 +79,11 @@ export class GradWatch {
         if (!triggered) continue; // below the multiple — keep watching, it may pump into it
 
         const text = `${formatGraduation(snap, solUsd)}\n\n<code>${w.mint}</code>`;
-        const result = await this.deps.send({ text, buttons: this.deps.buttons(w.mint) });
+        // Image via DexScreener's public token-image CDN (by mint). GMGN's own logo URLs are
+        // Cloudflare-walled — Telegram can't fetch them — so this reliable CDN gives the card a
+        // large image preview. A token DexScreener hasn't imaged 404s → graceful text-only.
+        const photoUrl = `https://dd.dexscreener.com/ds-data/tokens/solana/${w.mint}.png`;
+        const result = await this.deps.send({ text, photoUrl, buttons: this.deps.buttons(w.mint) });
         if (result.ok) {
           this.alerted.add(w.mint);
           this.watched.delete(w.mint);
