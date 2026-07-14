@@ -29,6 +29,7 @@ function harness(overrides: {
   graduationSnapshot?: (mint: string) => Promise<Tri<GradSnapshot>>;
   sendOk?: boolean;
   solUsd?: () => number;
+  image?: (mint: string) => Promise<string | undefined>;
 } = {}) {
   const sent: Array<{ text: string; photoUrl?: string; buttons?: unknown }> = [];
   const calls: string[] = [];
@@ -39,6 +40,7 @@ function harness(overrides: {
     send: async (payload) => { sent.push(payload); return { ok: overrides.sendOk ?? true }; },
     buttons: () => [[{ text: 'Chart', url: 'https://c' }]],
     solUsd: overrides.solUsd ?? (() => SOL_USD),
+    image: overrides.image ?? (async (m: string) => `https://ipfs.io/ipfs/img-${m}`),
     cfg: overrides.cfg ?? CFG,
     log: (msg) => logs.push(msg),
   };
@@ -82,13 +84,21 @@ describe('GradWatch', () => {
     expect(calls).toEqual(['mint1']); // not re-checked once alerted
   });
 
-  it('attaches the DexScreener CDN image (by mint) and the buttons', async () => {
+  it('attaches the pump.fun image (from the injected image dep) and the buttons', async () => {
     const { watch, sent } = harness({ graduationSnapshot: async () => snap() });
     watch.add('mint1', 0);
     await watch.sweep(1000);
     expect(sent).toHaveLength(1);
-    expect(sent[0].photoUrl).toBe('https://dd.dexscreener.com/ds-data/tokens/solana/mint1.png');
+    expect(sent[0].photoUrl).toBe('https://ipfs.io/ipfs/img-mint1'); // from the image dep
     expect(sent[0].buttons).toEqual([[{ text: 'Chart', url: 'https://c' }]]);
+  });
+
+  it('still sends (text-only) when the image lookup returns undefined', async () => {
+    const { watch, sent } = harness({ graduationSnapshot: async () => snap(), image: async () => undefined });
+    watch.add('mint1', 0);
+    await watch.sweep(1000);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].photoUrl).toBeUndefined();
   });
 
   it('a confirmed honeypot is dropped without sending', async () => {

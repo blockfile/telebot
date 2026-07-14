@@ -8,6 +8,8 @@ export interface GradWatchDeps {
   buttons: (mint: string) => Keyboard;
   /** Live SOL/USD price — the graduation-MC (SOL) is converted with this to compute the multiple. */
   solUsd: () => number;
+  /** Best-effort token image URL for the card (pump.fun v3 image_uri) — undefined → text-only. */
+  image?: (mint: string) => Promise<string | undefined>;
   cfg: GraduationMonitorConfig;
   log?: (msg: string) => void;
 }
@@ -79,10 +81,10 @@ export class GradWatch {
         if (!triggered) continue; // below the multiple — keep watching, it may pump into it
 
         const text = `${formatGraduation(snap, solUsd)}\n\n<code>${w.mint}</code>`;
-        // Image via DexScreener's public token-image CDN (by mint). GMGN's own logo URLs are
-        // Cloudflare-walled — Telegram can't fetch them — so this reliable CDN gives the card a
-        // large image preview. A token DexScreener hasn't imaged 404s → graceful text-only.
-        const photoUrl = `https://dd.dexscreener.com/ds-data/tokens/solana/${w.mint}.png`;
+        // Image = the token's pump.fun image_uri (mostly ipfs.io — the same source the bonding-phase
+        // cards use, and one Telegram can actually fetch, unlike GMGN's Cloudflare-walled logos).
+        // Best-effort: a failed lookup → undefined → the card still sends, just text-only.
+        const photoUrl = this.deps.image ? await this.deps.image(w.mint) : undefined;
         const result = await this.deps.send({ text, photoUrl, buttons: this.deps.buttons(w.mint) });
         if (result.ok) {
           this.alerted.add(w.mint);

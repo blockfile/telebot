@@ -7,7 +7,7 @@ import { Watchlist, type WatchedToken } from './pipeline/watchlist';
 import { stage1Filter } from './pipeline/stage1';
 import { runDeepChecks } from './pipeline/stage3';
 import { scoreToken } from './pipeline/scoring';
-import { fetchMeta, ipfsToHttp } from './checks/metadata';
+import { fetchMeta, ipfsToHttp, fetchPumpImageUri } from './checks/metadata';
 import { normalizeTwitterHandle } from './checks/socials';
 import { checkUrlAlive, checkXExists } from './checks/liveness';
 import { fetchDevHistory } from './checks/devHistory';
@@ -57,6 +57,7 @@ const gradWatch = cfg.graduationMonitor.enabled && gradGmgnClient
       send,
       buttons: (m) => buildButtons(m, cfg.buttons),
       solUsd: () => solPrice.usd,
+      image: (m) => fetchPumpImageUri(m),
       cfg: cfg.graduationMonitor,
       log: (msg) => log('info', msg),
     })
